@@ -94,6 +94,13 @@ export default function App() {
     }
   }, [session, currentDate])
 
+  const formatDateKey = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   const fetchMonthData = async () => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
@@ -260,6 +267,96 @@ export default function App() {
     (currentTask.check3 ? Number(currentTask.gram3 || 0) : 0)
   )
 
+  const renderMonthDays = () => {
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const firstDayIndex = new Date(year, month, 1).getDay()
+    const totalDays = new Date(year, month + 1, 0).getDate()
+
+    const days = []
+    for (let i = 0; i < firstDayIndex; i++) {
+      days.push(<div key={`empty-${i}`} style={styles.emptyCell}></div>)
+    }
+
+    const todayStr = formatDateKey(new Date())
+
+    for (let day = 1; day <= totalDays; day++) {
+      const dateObj = new Date(year, month, day)
+      const dateKey = formatDateKey(dateObj)
+      const taskData = monthTasks[dateKey]
+      const dayOfWeek = dateObj.getDay()
+
+      let checkedCount = 0
+      let hasNote = false
+      let sumGrams = 0
+
+      if (taskData) {
+        if (taskData.check1) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram1 || 0); 
+        }
+        if (taskData.check2) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram2 || 0); 
+        }
+        if (taskData.check3) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram3 || 0); 
+        }
+        if (taskData.note && typeof taskData.note === 'string' && taskData.note.trim() !== '') {
+          hasNote = true
+        }
+      }
+
+      const isToday = (dateKey === todayStr)
+
+      let cellBg = '#fff'
+      if (isToday) {
+        cellBg = '#e8f5e9'
+      } else if (dayOfWeek === 0) {
+        cellBg = '#fff5f5'
+      } else if (dayOfWeek === 6) {
+        cellBg = '#f0f4f8'
+      }
+
+      days.push(
+        <div
+          key={dateKey}
+          onClick={() => {
+            setSelectedDate(dateObj)
+            setViewMode('day')
+          }}
+          style={{
+            ...styles.dayCell,
+            backgroundColor: cellBg,
+            border: isToday ? '2px solid #2e7d32' : '1px solid #e2e8f0'
+          }}
+        >
+          <div style={{
+            ...styles.dayNumber,
+            color: dayOfWeek === 0 ? '#d32f2f' : dayOfWeek === 6 ? '#1976d2' : '#333'
+          }}>
+            {day} {isToday && <span style={styles.todayBadge}>今日</span>}
+          </div>
+          <div style={styles.cellInfo}>
+            {checkedCount > 0 ? (
+              <>
+                <span style={styles.badgeCheck}>チェック: {checkedCount}</span>
+                <span style={styles.badgeGram}>合計: {sumGrams}g</span>
+              </>
+            ) : (
+              <span style={{ color: '#aaa', fontSize: '10px' }}>未記録</span>
+            )}
+            {hasNote && (
+              <span style={styles.badgeNote} title="メモあり">📝</span>
+            )}
+          </div>
+        </div>
+      )
+    }
+    return days
+  }
+
   if (!session) {
     return (
       <div style={styles.authContainer}>
@@ -337,7 +434,7 @@ export default function App() {
                   {d}
                 </div>
               ))}
-              {renderMonthDays(currentDate, monthTasks, setSelectedDate, setViewMode)}
+              {renderMonthDays()}
             </div>
           </div>
         ) : (
@@ -508,104 +605,6 @@ export default function App() {
       </main>
     </div>
   )
-}
-
-// 外部ヘルパー関数として独立（コンポーネント内ネストによるビルドエラーを回避）
-const formatDateKey = (date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const renderMonthDays = (currentDate, monthTasks, setSelectedDate, setViewMode) => {
-  const year = currentDate.getFullYear()
-  const month = currentDate.getMonth()
-  const firstDayIndex = new Date(year, month, 1).getDay()
-  const totalDays = new Date(year, month + 1, 0).getDate()
-
-  const days = []
-  for (let i = 0; i < firstDayIndex; i++) {
-    days.push(<div key={`empty-${i}`} style={styles.emptyCell}></div>)
-  }
-
-  const todayStr = formatDateKey(new Date())
-
-  for (let day = 1; day <= totalDays; day++) {
-    const dateObj = new Date(year, month, day)
-    const dateKey = formatDateKey(dateObj)
-    const taskData = monthTasks[dateKey]
-    const dayOfWeek = dateObj.getDay()
-
-    let checkedCount = 0
-    let hasNote = false
-    let sumGrams = 0
-
-    if (taskData) {
-      if (taskData.check1) { 
-        checkedCount++; 
-        sumGrams += Number(taskData.gram1 || 0); 
-      }
-      if (taskData.check2) { 
-        checkedCount++; 
-        sumGrams += Number(taskData.gram2 || 0); 
-      }
-      if (taskData.check3) { 
-        checkedCount++; 
-        sumGrams += Number(taskData.gram3 || 0); 
-      }
-      if (taskData.note && typeof taskData.note === 'string' && taskData.note.trim() !== '') {
-        hasNote = true
-      }
-    }
-
-    const isToday = (dateKey === todayStr)
-
-    let cellBg = '#fff'
-    if (isToday) {
-      cellBg = '#e8f5e9'
-    } else if (dayOfWeek === 0) {
-      cellBg = '#fff5f5'
-    } else if (dayOfWeek === 6) {
-      cellBg = '#f0f4f8'
-    }
-
-    days.push(
-      <div
-        key={dateKey}
-        onClick={() => {
-          setSelectedDate(dateObj)
-          setViewMode('day')
-        }}
-        style={{
-          ...styles.dayCell,
-          backgroundColor: cellBg,
-          border: isToday ? '2px solid #2e7d32' : '1px solid #e2e8f0'
-        }}
-      >
-        <div style={{
-          ...styles.dayNumber,
-          color: dayOfWeek === 0 ? '#d32f2f' : dayOfWeek === 6 ? '#1976d2' : '#333'
-        }}>
-          {day} {isToday && <span style={styles.todayBadge}>今日</span>}
-        </div>
-        <div style={styles.cellInfo}>
-          {checkedCount > 0 ? (
-            <>
-              <span style={styles.badgeCheck}>チェック: {checkedCount}</span>
-              <span style={styles.badgeGram}>合計: {sumGrams}g</span>
-            </>
-          ) : (
-            <span style={{ color: '#aaa', fontSize: '10px' }}>未記録</span>
-          )}
-          {hasNote && (
-            <span style={styles.badgeNote} title="メモあり">📝</span>
-          )}
-        </div>
-      </div>
-    )
-  }
-  return days
 }
 
 const styles = {

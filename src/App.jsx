@@ -16,7 +16,6 @@ import {
   getDocs 
 } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react'
-import * as emailjs from '@emailjs/browser'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -48,28 +47,41 @@ export default function App() {
     return () => unsubscribe()
   }, [])
 
-  // 新規登録時のウェルカムメール送信関数（登録者 ＆ ronron201907@gmail.com へ送信）
+  // EmailJSのREST API（fetch）を使ったメール送信関数
   const sendWelcomeEmail = async (userEmail) => {
-    try {
-      const templateParams = {
-        to_email: userEmail,
-        admin_email: 'ronron201907@gmail.com',
-        message: 'ようこそ、ロン大好きに登録いただきありがとうございます！'
+    const SERVICE_ID = 'YOUR_SERVICE_ID'
+    const TEMPLATE_ID = 'YOUR_TEMPLATE_ID'
+    const PUBLIC_KEY = 'YOUR_PUBLIC_KEY'
+
+    const sendMail = async (recipientEmail, messageText) => {
+      try {
+        const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            service_id: SERVICE_ID,
+            template_id: TEMPLATE_ID,
+            user_id: PUBLIC_KEY,
+            template_params: {
+              to_email: recipientEmail,
+              admin_email: 'ronron201907@gmail.com',
+              message: messageText
+            }
+          })
+        })
+        if (!response.ok) {
+          console.warn("メール送信レスポンスエラー:", await response.text())
+        }
+      } catch (mailError) {
+        console.warn("ウェルカムメールの送信に失敗しましたが、処理は継続します:", mailError)
       }
-
-      await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams, 'YOUR_PUBLIC_KEY')
-      
-      const adminParams = {
-        ...templateParams,
-        to_email: 'ronron201907@gmail.com'
-      }
-      await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', adminParams, 'YOUR_PUBLIC_KEY')
-
-      console.log("ウェルカムメールの送信が完了しました。")
-
-    } catch (mailError) {
-      console.warn("ウェルカムメールの送信に失敗しましたが、登録処理は継続します:", mailError)
     }
+
+    // 登録者宛と管理者宛の送信
+    await sendMail(userEmail, 'ようこそ、ロン大好きに登録いただきありがとうございます！')
+    await sendMail('ronron201907@gmail.com', `新しいユーザーが登録されました: ${userEmail}`)
   }
 
   const handleAuth = async (e) => {

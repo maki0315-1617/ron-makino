@@ -1,45 +1,35 @@
 import React, { useState, useEffect } from 'react'
-import { initializeApp } from 'firebase/app'
+import { auth, db } from './firebase'
 import { 
-  getFirestore, 
-  collection, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth'
+import { 
   doc, 
   getDoc, 
   setDoc, 
-  getDocs, 
+  collection, 
   query, 
   where, 
-  Timestamp 
+  getDocs 
 } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react'
 
-// Firebaseの設定（環境に合わせて適宜書き換えてください）
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
-}
-
-const app = initializeApp(firebaseConfig)
-const db = getFirestore(app)
-
-const formatDateKey = (date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 export default function App() {
-  const [session, setSession] = useState({ uid: 'default_user', name: '管理者', email: 'ron@example.com' })
-  const [currentView, setCurrentView] = useState('day')
+  const [session, setSession] = useState(null)
+  const [authMode, setAuthMode] = useState('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+
+  const [viewMode, setViewMode] = useState('month')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [loading, setLoading] = useState(false)
-
+  
+  const [monthTasks, setMonthTasks] = useState({})
+  
   const [currentTask, setCurrentTask] = useState({
     check1: false, time1: '', gram1: 15,
     check2: false, time2: '', gram2: 15,
@@ -47,17 +37,77 @@ export default function App() {
     note: '',
     user_name: ''
   })
+  const [loading, setLoading] = useState(false)
 
-  const [monthTasks, setMonthTasks] = useState({})
-
-  // 日付変更時やビュー切り替え時にデータを取得
+  // 認証状態の監視
   useEffect(() => {
-    if (currentView === 'day') {
-      fetchDayData(selectedDate)
-    } else {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setSession(user)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  const handleAuth = async (e) => {
+    e.preventDefault()
+    setAuthError('')
+    try {
+      if (authMode === 'signup') {
+        await createUserWithEmailAndPassword(auth, email, password)
+      } else {
+        await signInWithEmailAndPassword(auth, email, password)
+      }
+    } catch (error) {
+      setAuthError(error.message)
+    }
+  }
+
+  // 月カレンダー用のデータ取得
+  useEffect(() => {
+    if (session) {
       fetchMonthData()
     }
-  }, [selectedDate, currentView, currentDate])
+  }, [session, currentDate])
+
+  const formatDateKey = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const fetchMonthData = async () => {
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const startDateStr = formatDateKey(new Date(year, month, 1))
+    const endDateStr = formatDateKey(new Date(year, month + 1, 0))
+
+    try {
+      const q = query(
+        collection(db, 'daily_tasks'),
+        where('user_id', '==', session.uid),
+        where('date', '>=', startDateStr),
+        where('date', '<=', endDateStr)
+      )
+      const querySnapshot = await getDocs(q)
+      const map = {}
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data()
+        if (data.date) {
+          map[data.date] = data
+        }
+      })
+      setMonthTasks(map)
+    } catch (error) {
+      console.error("月データ取得エラー:", error)
+    }
+  }
+
+  // 選択日のデータ取得
+  useEffect(() => {
+    if (session && viewMode === 'day') {
+      fetchDayData(selectedDate)
+    }
+  }, [selectedDate, viewMode, session])
 
   const fetchDayData = async (date) => {
     setLoading(true)
@@ -94,35 +144,6 @@ export default function App() {
       }
     } catch (error) {
       console.error("日データ取得エラー:", error)
-    }
-    setLoading(false)
-  }
-
-  const fetchMonthData = async () => {
-    setLoading(true)
-    const year = currentDate.getFullYear()
-    const month = currentDate.getMonth()
-    const startDateStr = formatDateKey(new Date(year, month, 1))
-    const endDateStr = formatDateKey(new Date(year, month + 1, 0))
-
-    try {
-      const q = query(
-        collection(db, 'daily_tasks'),
-        where('user_id', '==', session.uid),
-        where('date', '>=', startDateStr),
-        where('date', '<=', endDateStr)
-      )
-      const querySnapshot = await getDocs(q)
-      const map = {}
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data()
-        if (data.date) {
-          map[data.date] = data
-        }
-      })
-      setMonthTasks(map)
-    } catch (error) {
-      console.error("月データ取得エラー:", error)
     }
     setLoading(false)
   }
@@ -194,8 +215,8 @@ export default function App() {
         time3: taskToSave.time3,
         gram3: Number(taskToSave.gram3),
         note: taskToSave.note,
-        updated_at: Timestamp.now()
-      }, { merge: true })
+        updated_at: new Date()
+      })
       fetchMonthData()
     } catch (error) {
       console.error("データ保存エラー:", error)
@@ -220,6 +241,50 @@ export default function App() {
     (currentTask.check3 ? Number(currentTask.gram3 || 0) : 0)
   )
 
+  if (!session) {
+    return (
+      <div style={styles.authContainer}>
+        <div style={styles.authBox}>
+          <div style={styles.brandHeader}>
+            <img src="/ron.png" alt="ロン君" style={styles.smallRonIcon} />
+            <h2>ロン大好き</h2>
+          </div>
+          <p style={{ fontSize: '13px', color: '#666', marginBottom: '15px' }}>
+            {authMode === 'login' ? 'ログイン画面' : '新規登録画面'}
+          </p>
+          {authError && <p style={{ color: 'red', fontSize: '13px' }}>{authError}</p>}
+          <form onSubmit={handleAuth} style={styles.form}>
+            <input
+              type="email"
+              placeholder="メールアドレス"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={styles.input}
+            />
+            <input
+              type="password"
+              placeholder="パスワード"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={styles.input}
+            />
+            <button type="submit" style={styles.primaryButton}>
+              {authMode === 'login' ? 'ログイン' : '登録する'}
+            </button>
+          </form>
+          <button 
+            onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+            style={styles.textButton}
+          >
+            {authMode === 'login' ? 'アカウントをお持ちでない方は新規登録' : 'すでにアカウントをお持ちの方はこちら'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -229,216 +294,200 @@ export default function App() {
         </div>
         <div style={styles.userInfo}>
           <span style={styles.userEmail}>{session.email}</span>
+          <button onClick={() => signOut(auth)} style={styles.logoutButton}>
+            <LogOut size={16} /> ログアウト
+          </button>
         </div>
       </header>
 
-      {/* ナビゲーション切り替えボタン */}
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-        <button 
-          onClick={() => setCurrentView('day')}
-          style={{ background: currentView === 'day' ? '#007bff' : '#ccc', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          日めくりビュー
-        </button>
-        <button 
-          onClick={() => {
-            setCurrentView('month')
-            // 月ビューに切り替える際、現在選択中の日付の月に合わせる
-            setCurrentDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1))
-          }}
-          style={{ background: currentView === 'month' ? '#007bff' : '#ccc', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          月カレンダービュー
-        </button>
-      </div>
+      <main style={styles.main}>
+        {viewMode === 'month' ? (
+          <div>
+            <div style={styles.navHeader}>
+              <button onClick={() => changeMonth(-1)} style={styles.iconButton}><ChevronLeft /></button>
+              <h2>{currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月</h2>
+              <button onClick={() => changeMonth(1)} style={styles.iconButton}><ChevronRight /></button>
+            </div>
 
-      {loading && <p>読み込み中...</p>}
-
-      {/* 日めくりビュー */}
-      {currentView === 'day' && !loading && (
-        <div>
-          <div style={styles.navHeader}>
-            <button onClick={() => changeDay(-1)} style={styles.navButton}><ChevronLeft /> 前日</button>
-            <h2>{selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月 {selectedDate.getDate()}日</h2>
-            <button onClick={() => changeDay(1)} style={styles.navButton}>翌日 <ChevronRight /></button>
+            <div style={styles.calendarGrid}>
+              {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
+                <div key={i} style={{
+                  ...styles.weekHeader,
+                  color: i === 0 ? '#d32f2f' : i === 6 ? '#1976d2' : '#333'
+                }}>
+                  {d}
+                </div>
+              ))}
+              {renderMonthDays()}
+            </div>
           </div>
+        ) : (
+          <div>
+            <div style={styles.navHeader}>
+              <button onClick={() => changeDay(-1)} style={styles.navButton}><ChevronLeft /> 前日</button>
+              <h2>{selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月 {selectedDate.getDate()}日</h2>
+              <button onClick={() => changeDay(1)} style={styles.navButton}>翌日 <ChevronRight /></button>
+            </div>
 
-          <div style={styles.topSubBar}>
-            {currentTask.user_name && (
-              <div style={styles.userBadge}>
-                <User size={14} /> 更新者: {currentTask.user_name}
+            <div style={styles.topSubBar}>
+              <button onClick={() => setViewMode('month')} style={styles.secondaryButton}>
+                月カレンダーに戻る
+              </button>
+              {currentTask.user_name && (
+                <div style={styles.userBadge}>
+                  <User size={14} /> 更新者: {currentTask.user_name}
+                </div>
+              )}
+            </div>
+
+            {isFutureDate(selectedDate) && (
+              <div style={styles.futureWarning}>
+                ※ 未来日のため入力・編集はできません（閲覧のみ可能です）。
+              </div>
+            )}
+
+            {loading ? <p>読み込み中...</p> : (
+              <div style={styles.card}>
+                <h3>作業チェック項目</h3>
+                
+                {/* 項目1 */}
+                <div style={styles.taskRow}>
+                  <label style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={currentTask.check1}
+                      onChange={() => handleCheckboxChange(1)}
+                      disabled={isFutureDate(selectedDate)}
+                      style={styles.checkbox}
+                    />
+                    作業項目 1
+                  </label>
+                  <div style={styles.rowInputs}>
+                    <span>時分:</span>
+                    <input
+                      type="text"
+                      value={currentTask.time1}
+                      onChange={(e) => handleFieldChange('time1', e.target.value)}
+                      disabled={!currentTask.check1 || isFutureDate(selectedDate)}
+                      style={styles.smallInput}
+                      placeholder="--:--"
+                    />
+                    <span>グラム:</span>
+                    <select
+                      value={currentTask.gram1}
+                      onChange={(e) => handleFieldChange('gram1', e.target.value)}
+                      disabled={!currentTask.check1 || isFutureDate(selectedDate)}
+                      style={styles.smallSelect}
+                    >
+                      <option value="5">5g</option>
+                      <option value="10">10g</option>
+                      <option value="15">15g</option>
+                      <option value="20">20g</option>
+                      <option value="25">25g</option>
+                      <option value="30">30g</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 項目2 */}
+                <div style={styles.taskRow}>
+                  <label style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={currentTask.check2}
+                      onChange={() => handleCheckboxChange(2)}
+                      disabled={isFutureDate(selectedDate)}
+                      style={styles.checkbox}
+                    />
+                    作業項目 2
+                  </label>
+                  <div style={styles.rowInputs}>
+                    <span>時分:</span>
+                    <input
+                      type="text"
+                      value={currentTask.time2}
+                      onChange={(e) => handleFieldChange('time2', e.target.value)}
+                      disabled={!currentTask.check2 || isFutureDate(selectedDate)}
+                      style={styles.smallInput}
+                      placeholder="--:--"
+                    />
+                    <span>グラム:</span>
+                    <select
+                      value={currentTask.gram2}
+                      onChange={(e) => handleFieldChange('gram2', e.target.value)}
+                      disabled={!currentTask.check2 || isFutureDate(selectedDate)}
+                      style={styles.smallSelect}
+                    >
+                      <option value="5">5g</option>
+                      <option value="10">10g</option>
+                      <option value="15">15g</option>
+                      <option value="20">20g</option>
+                      <option value="25">25g</option>
+                      <option value="30">30g</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 項目3 */}
+                <div style={styles.taskRow}>
+                  <label style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={currentTask.check3}
+                      onChange={() => handleCheckboxChange(3)}
+                      disabled={isFutureDate(selectedDate)}
+                      style={styles.checkbox}
+                    />
+                    作業項目 3
+                  </label>
+                  <div style={styles.rowInputs}>
+                    <span>時分:</span>
+                    <input
+                      type="text"
+                      value={currentTask.time3}
+                      onChange={(e) => handleFieldChange('time3', e.target.value)}
+                      disabled={!currentTask.check3 || isFutureDate(selectedDate)}
+                      style={styles.smallInput}
+                      placeholder="--:--"
+                    />
+                    <span>グラム:</span>
+                    <select
+                      value={currentTask.gram3}
+                      onChange={(e) => handleFieldChange('gram3', e.target.value)}
+                      disabled={!currentTask.check3 || isFutureDate(selectedDate)}
+                      style={styles.smallSelect}
+                    >
+                      <option value="5">5g</option>
+                      <option value="10">10g</option>
+                      <option value="15">15g</option>
+                      <option value="20">20g</option>
+                      <option value="25">25g</option>
+                      <option value="30">30g</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={styles.totalDisplayBox}>
+                  <strong>本日の合計グラム数: </strong>
+                  <span style={styles.totalValue}>{totalGrams} g</span>
+                </div>
+
+                <div style={styles.noteSection}>
+                  <label style={styles.noteLabel}>メモ・コメント（複数行入力可能）：</label>
+                  <textarea
+                    value={currentTask.note}
+                    onChange={(e) => handleFieldChange('note', e.target.value)}
+                    disabled={isFutureDate(selectedDate)}
+                    rows={4}
+                    style={styles.textarea}
+                    placeholder="作業の詳細や気付いたことを入力してください..."
+                  />
+                </div>
               </div>
             )}
           </div>
-
-          {isFutureDate(selectedDate) && (
-            <div style={styles.futureWarning}>
-              ※ 未来日のため入力・編集はできません（閲覧のみ可能です）。
-            </div>
-          )}
-
-          <div style={styles.card}>
-            <h3>作業チェック項目</h3>
-            
-            {/* 項目1 */}
-            <div style={styles.taskRow}>
-              <label style={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={currentTask.check1}
-                  onChange={() => handleCheckboxChange(1)}
-                  disabled={isFutureDate(selectedDate)}
-                  style={styles.checkbox}
-                />
-                作業項目 1
-              </label>
-              <div style={styles.rowInputs}>
-                <span>時分:</span>
-                <input
-                  type="text"
-                  value={currentTask.time1}
-                  onChange={(e) => handleFieldChange('time1', e.target.value)}
-                  disabled={!currentTask.check1 || isFutureDate(selectedDate)}
-                  style={styles.smallInput}
-                  placeholder="--:--"
-                />
-                <span>グラム:</span>
-                <select
-                  value={currentTask.gram1}
-                  onChange={(e) => handleFieldChange('gram1', e.target.value)}
-                  disabled={!currentTask.check1 || isFutureDate(selectedDate)}
-                  style={styles.smallSelect}
-                >
-                  <option value="5">5g</option>
-                  <option value="10">10g</option>
-                  <option value="15">15g</option>
-                  <option value="20">20g</option>
-                  <option value="25">25g</option>
-                  <option value="30">30g</option>
-                </select>
-              </div>
-            </div>
-
-            {/* 項目2 */}
-            <div style={styles.taskRow}>
-              <label style={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={currentTask.check2}
-                  onChange={() => handleCheckboxChange(2)}
-                  disabled={isFutureDate(selectedDate)}
-                  style={styles.checkbox}
-                />
-                作業項目 2
-              </label>
-              <div style={styles.rowInputs}>
-                <span>時分:</span>
-                <input
-                  type="text"
-                  value={currentTask.time2}
-                  onChange={(e) => handleFieldChange('time2', e.target.value)}
-                  disabled={!currentTask.check2 || isFutureDate(selectedDate)}
-                  style={styles.smallInput}
-                  placeholder="--:--"
-                />
-                <span>グラム:</span>
-                <select
-                  value={currentTask.gram2}
-                  onChange={(e) => handleFieldChange('gram2', e.target.value)}
-                  disabled={!currentTask.check2 || isFutureDate(selectedDate)}
-                  style={styles.smallSelect}
-                >
-                  <option value="5">5g</option>
-                  <option value="10">10g</option>
-                  <option value="15">15g</option>
-                  <option value="20">20g</option>
-                  <option value="25">25g</option>
-                  <option value="30">30g</option>
-                </select>
-              </div>
-            </div>
-
-            {/* 項目3 */}
-            <div style={styles.taskRow}>
-              <label style={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={currentTask.check3}
-                  onChange={() => handleCheckboxChange(3)}
-                  disabled={isFutureDate(selectedDate)}
-                  style={styles.checkbox}
-                />
-                作業項目 3
-              </label>
-              <div style={styles.rowInputs}>
-                <span>時分:</span>
-                <input
-                  type="text"
-                  value={currentTask.time3}
-                  onChange={(e) => handleFieldChange('time3', e.target.value)}
-                  disabled={!currentTask.check3 || isFutureDate(selectedDate)}
-                  style={styles.smallInput}
-                  placeholder="--:--"
-                />
-                <span>グラム:</span>
-                <select
-                  value={currentTask.gram3}
-                  onChange={(e) => handleFieldChange('gram3', e.target.value)}
-                  disabled={!currentTask.check3 || isFutureDate(selectedDate)}
-                  style={styles.smallSelect}
-                >
-                  <option value="5">5g</option>
-                  <option value="10">10g</option>
-                  <option value="15">15g</option>
-                  <option value="20">20g</option>
-                  <option value="25">25g</option>
-                  <option value="30">30g</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={styles.totalDisplayBox}>
-              <strong>本日の合計グラム数: </strong>
-              <span style={styles.totalValue}>{totalGrams} g</span>
-            </div>
-
-            <div style={styles.noteSection}>
-              <label style={styles.noteLabel}>メモ・コメント：</label>
-              <textarea
-                value={currentTask.note}
-                onChange={(e) => handleFieldChange('note', e.target.value)}
-                disabled={isFutureDate(selectedDate)}
-                rows={4}
-                style={styles.textarea}
-                placeholder="作業の詳細や気付いたことを入力してください..."
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 月カレンダービュー */}
-      {currentView === 'month' && !loading && (
-        <div>
-          <div style={styles.navHeader}>
-            <button onClick={() => changeMonth(-1)} style={styles.iconButton}><ChevronLeft /></button>
-            <h2>{currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月</h2>
-            <button onClick={() => changeMonth(1)} style={styles.iconButton}><ChevronRight /></button>
-          </div>
-
-          <div style={styles.calendarGrid}>
-            {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
-              <div key={i} style={{
-                ...styles.weekHeader,
-                color: i === 0 ? '#d32f2f' : i === 6 ? '#1976d2' : '#333'
-              }}>
-                {d}
-              </div>
-            ))}
-            {renderMonthDays()}
-          </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   )
 
@@ -466,9 +515,18 @@ export default function App() {
       let sumGrams = 0
 
       if (taskData) {
-        if (taskData.check1) { checkedCount++; sumGrams += Number(taskData.gram1 || 0); }
-        if (taskData.check2) { checkedCount++; sumGrams += Number(taskData.gram2 || 0); }
-        if (taskData.check3) { checkedCount++; sumGrams += Number(taskData.gram3 || 0); }
+        if (taskData.check1) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram1 || 0); 
+        }
+        if (taskData.check2) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram2 || 0); 
+        }
+        if (taskData.check3) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram3 || 0); 
+        }
         if (taskData.note && typeof taskData.note === 'string' && taskData.note.trim() !== '') {
           hasNote = true
         }
@@ -490,7 +548,7 @@ export default function App() {
           key={dateKey}
           onClick={() => {
             setSelectedDate(dateObj)
-            setCurrentView('day')
+            setViewMode('day')
           }}
           style={{
             ...styles.dayCell,
@@ -529,15 +587,24 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '15px', marginBottom: '20px' },
   headerTitleArea: { display: 'flex', alignItems: 'center', gap: '10px' },
   smallRonIcon: { width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' },
+  brandHeader: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '5px' },
   title: { margin: 0, fontSize: '20px' },
   userInfo: { display: 'flex', alignItems: 'center', gap: '10px' },
   userEmail: { fontSize: '14px', color: '#666' },
+  logoutButton: { display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#f5f5f5', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' },
+  
+  authContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f9f9f9' },
+  authBox: { background: '#fff', padding: '30px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', width: '320px', textAlign: 'center' },
+  form: { display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' },
+  input: { padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px' },
+  primaryButton: { padding: '10px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '14px', cursor: 'pointer' },
+  textButton: { background: 'none', border: 'none', color: '#007bff', marginTop: '15px', cursor: 'pointer', fontSize: '12px' },
 
   navHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' },
   iconButton: { background: 'none', border: '1px solid #ccc', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer' },
   navButton: { display: 'flex', alignItems: 'center', background: '#f8f9fa', border: '1px solid #ccc', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer' },
   
-  topSubBar: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '10px' },
+  topSubBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' },
   userBadge: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', background: '#e2e8f0', padding: '4px 8px', borderRadius: '4px', color: '#4a5568' },
   futureWarning: { background: '#fff3cd', color: '#856404', padding: '10px', borderRadius: '4px', marginBottom: '15px', fontSize: '14px', textAlign: 'center' },
 
@@ -551,6 +618,8 @@ const styles = {
   badgeCheck: { background: '#e3f2fd', color: '#0d47a1', padding: '2px 4px', borderRadius: '3px', textAlign: 'center' },
   badgeGram: { background: '#e8f5e9', color: '#1b5e20', padding: '2px 4px', borderRadius: '3px', textAlign: 'center' },
   badgeNote: { fontSize: '12px', alignSelf: 'flex-end', marginTop: '2px' },
+
+  secondaryButton: { padding: '8px 16px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },
   
   card: { background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
   taskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f1f3f5' },

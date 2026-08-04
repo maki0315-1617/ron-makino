@@ -16,7 +16,7 @@ import {
   getDocs 
 } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react'
-import emailjs from '@emailjs/browser'
+import * as emailjs from '@emailjs/browser'
 
 export default function App() {
   const [session, setSession] = useState(null)

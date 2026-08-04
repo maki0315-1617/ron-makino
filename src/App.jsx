@@ -111,6 +111,15 @@ export default function App() {
 
   const fetchDayData = async (date) => {
     setLoading(true)
+    // 別の日のデータが残らないよう、データ取得前に一度フォームを初期化する
+    setCurrentTask({
+      check1: false, time1: '', gram1: 15,
+      check2: false, time2: '', gram2: 15,
+      check3: false, time3: '', gram3: 15,
+      note: '',
+      user_name: ''
+    })
+
     const dateKey = formatDateKey(date)
     const docId = `${session.uid}_${dateKey}`
     
@@ -132,14 +141,6 @@ export default function App() {
           gram3: data.gram3 !== undefined ? data.gram3 : 15,
           note: data.note || '',
           user_name: data.user_name || ''
-        })
-      } else {
-        setCurrentTask({
-          check1: false, time1: '', gram1: 15,
-          check2: false, time2: '', gram2: 15,
-          check3: false, time3: '', gram3: 15,
-          note: '',
-          user_name: ''
         })
       }
     } catch (error) {

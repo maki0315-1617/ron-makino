@@ -47,36 +47,12 @@ export default function App() {
     return () => unsubscribe()
   }, [])
 
-  // 新規登録時のウェルカムメール送信関数（失敗しても例外をキャッチして登録を止めない）
-  const sendWelcomeEmail = async (userEmail) => {
-    try {
-      // 実際にはバックエンドAPI（Firebase Functionsや外部メール配信用APIなど）を呼び出します
-      console.log(`[ウェルカムメール送信] 宛先: ${userEmail}`)
-      console.log("件名: ようこそ、ロン大好きへ！")
-      console.log("本文: ロン大好きに登録いただきありがとうございます！毎日の記録を楽しく続けましょう。")
-      
-      // 例: サーバーAPIを叩く場合
-      // const response = await fetch('/api/send-welcome-email', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email: userEmail })
-      // })
-      // if (!response.ok) throw new Error('メール送信に失敗しました')
-
-    } catch (mailError) {
-      // メール送信がNG（失敗）でも登録自体は止めない（エラーをコンソールに留めるのみ）
-      console.warn("ウェルカムメールの送信に失敗しましたが、登録処理は継続します:", mailError)
-    }
-  }
-
   const handleAuth = async (e) => {
     e.preventDefault()
     setAuthError('')
     try {
       if (authMode === 'signup') {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-        // 新規登録成功時にメール送信処理を実行（失敗しても登録自体は完了する）
-        await sendWelcomeEmail(userCredential.user.email)
+        await createUserWithEmailAndPassword(auth, email, password)
       } else {
         await signInWithEmailAndPassword(auth, email, password)
       }

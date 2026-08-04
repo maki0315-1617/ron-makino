@@ -16,6 +16,7 @@ import {
   getDocs 
 } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react'
+import emailjs from '@emailjs/browser'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -47,12 +48,37 @@ export default function App() {
     return () => unsubscribe()
   }, [])
 
+  // 新規登録時のウェルカムメール送信関数（登録者 ＆ ronron201907@gmail.com へ送信）
+  const sendWelcomeEmail = async (userEmail) => {
+    try {
+      const templateParams = {
+        to_email: userEmail,
+        admin_email: 'ronron201907@gmail.com',
+        message: 'ようこそ、ロン大好きに登録いただきありがとうございます！'
+      }
+
+      await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams, 'YOUR_PUBLIC_KEY')
+      
+      const adminParams = {
+        ...templateParams,
+        to_email: 'ronron201907@gmail.com'
+      }
+      await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', adminParams, 'YOUR_PUBLIC_KEY')
+
+      console.log("ウェルカムメールの送信が完了しました。")
+
+    } catch (mailError) {
+      console.warn("ウェルカムメールの送信に失敗しましたが、登録処理は継続します:", mailError)
+    }
+  }
+
   const handleAuth = async (e) => {
     e.preventDefault()
     setAuthError('')
     try {
       if (authMode === 'signup') {
-        await createUserWithEmailAndPassword(auth, email, password)
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+        await sendWelcomeEmail(userCredential.user.email)
       } else {
         await signInWithEmailAndPassword(auth, email, password)
       }
@@ -111,7 +137,6 @@ export default function App() {
 
   const fetchDayData = async (date) => {
     setLoading(true)
-    // 別の日のデータが残らないよう、データ取得前に一度フォームを初期化する
     setCurrentTask({
       check1: false, time1: '', gram1: 15,
       check2: false, time2: '', gram2: 15,
@@ -186,7 +211,7 @@ export default function App() {
   }
 
   const handleFieldChange = (field, value) => {
-    if (isFutureDate(selectedDate)) return
+    if (isFutureDate(selectedDate) && field !== 'note') return
 
     const updated = {
       ...currentTask,
@@ -343,7 +368,7 @@ export default function App() {
 
             {isFutureDate(selectedDate) && (
               <div style={styles.futureWarning}>
-                ※ 未来日のため入力・編集はできません（閲覧のみ可能です）。
+                ※ 未来日のためチェック・作業内容の入力はできませんが、メモ欄のみ入力・編集が可能です。
               </div>
             )}
 
@@ -478,7 +503,6 @@ export default function App() {
                   <textarea
                     value={currentTask.note}
                     onChange={(e) => handleFieldChange('note', e.target.value)}
-                    disabled={isFutureDate(selectedDate)}
                     rows={4}
                     style={styles.textarea}
                     placeholder="作業の詳細や気付いたことを入力してください..."

@@ -205,13 +205,13 @@ export default function App() {
         user_id: session.uid,
         user_name: taskToSave.user_name,
         date: dateKey,
-        check1: taskToSave.check1,
+        check1: Boolean(taskToSave.check1),
         time1: taskToSave.time1,
         gram1: Number(taskToSave.gram1),
-        check2: taskToSave.check2,
+        check2: Boolean(taskToSave.check2),
         time2: taskToSave.time2,
         gram2: Number(taskToSave.gram2),
-        check3: taskToSave.check3,
+        check3: Boolean(taskToSave.check3),
         time3: taskToSave.time3,
         gram3: Number(taskToSave.gram3),
         note: taskToSave.note,
@@ -515,10 +515,19 @@ export default function App() {
       let sumGrams = 0
 
       if (taskData) {
-        if (taskData.check1) { checkedCount++; sumGrams += Number(taskData.gram1 || 0); }
-        if (taskData.check2) { checkedCount++; sumGrams += Number(taskData.gram2 || 0); }
-        if (taskData.check3) { checkedCount++; sumGrams += Number(taskData.gram3 || 0); }
-        if (taskData.note && taskData.note.trim() !== '') {
+        if (taskData.check1) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram1 || 0); 
+        }
+        if (taskData.check2) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram2 || 0); 
+        }
+        if (taskData.check3) { 
+          checkedCount++; 
+          sumGrams += Number(taskData.gram3 || 0); 
+        }
+        if (taskData.note && typeof taskData.note === 'string' && taskData.note.trim() !== '') {
           hasNote = true
         }
       }
@@ -554,11 +563,13 @@ export default function App() {
             {day} {isToday && <span style={styles.todayBadge}>今日</span>}
           </div>
           <div style={styles.cellInfo}>
-            {checkedCount > 0 && (
+            {checkedCount > 0 ? (
               <>
                 <span style={styles.badgeCheck}>チェック: {checkedCount}</span>
                 <span style={styles.badgeGram}>合計: {sumGrams}g</span>
               </>
+            ) : (
+              <span style={{ color: '#aaa', fontSize: '10px' }}>未記録</span>
             )}
             {hasNote && (
               <span style={styles.badgeNote} title="メモあり">📝</span>
@@ -606,7 +617,7 @@ const styles = {
   cellInfo: { display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px' },
   badgeCheck: { background: '#e3f2fd', color: '#0d47a1', padding: '2px 4px', borderRadius: '3px', textAlign: 'center' },
   badgeGram: { background: '#e8f5e9', color: '#1b5e20', padding: '2px 4px', borderRadius: '3px', textAlign: 'center' },
-  badgeNote: { fontSize: '12px', alignSelf: 'flex-end' },
+  badgeNote: { fontSize: '12px', alignSelf: 'flex-end', marginTop: '2px' },
 
   secondaryButton: { padding: '8px 16px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },
   

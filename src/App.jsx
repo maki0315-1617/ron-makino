@@ -92,7 +92,9 @@ export default function App() {
       const map = {}
       querySnapshot.forEach((docSnap) => {
         const data = docSnap.data()
-        map[data.date] = data
+        if (data.date) {
+          map[data.date] = data
+        }
       })
       setMonthTasks(map)
     } catch (error) {
@@ -243,7 +245,13 @@ export default function App() {
     return (
       <div style={styles.authContainer}>
         <div style={styles.authBox}>
-          <h2>{authMode === 'login' ? 'メンバーログイン' : '新規メンバー登録'}</h2>
+          <div style={styles.brandHeader}>
+            <img src="/ron.png" alt="ロン君" style={styles.smallRonIcon} />
+            <h2>ロン大好き</h2>
+          </div>
+          <p style={{ fontSize: '13px', color: '#666', marginBottom: '15px' }}>
+            {authMode === 'login' ? 'ログイン画面' : '新規登録画面'}
+          </p>
           {authError && <p style={{ color: 'red', fontSize: '13px' }}>{authError}</p>}
           <form onSubmit={handleAuth} style={styles.form}>
             <input
@@ -280,7 +288,10 @@ export default function App() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={styles.title}>作業管理システム（Firestore）</h1>
+        <div style={styles.headerTitleArea}>
+          <img src="/ron.png" alt="ロン君" style={styles.smallRonIcon} />
+          <h1 style={styles.title}>ロン大好き</h1>
+        </div>
         <div style={styles.userInfo}>
           <span style={styles.userEmail}>{session.email}</span>
           <button onClick={() => signOut(auth)} style={styles.logoutButton}>
@@ -563,6 +574,9 @@ export default function App() {
 const styles = {
   container: { fontFamily: 'sans-serif', maxWidth: '850px', margin: '0 auto', padding: '20px', color: '#333' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '15px', marginBottom: '20px' },
+  headerTitleArea: { display: 'flex', alignItems: 'center', gap: '10px' },
+  smallRonIcon: { width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' },
+  brandHeader: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '5px' },
   title: { margin: 0, fontSize: '20px' },
   userInfo: { display: 'flex', alignItems: 'center', gap: '10px' },
   userEmail: { fontSize: '14px', color: '#666' },

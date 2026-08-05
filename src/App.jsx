@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, Component } from 'react'
 import { auth, db } from './firebase'
 import { 
   signInWithEmailAndPassword, 
@@ -17,7 +17,53 @@ import {
 } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react'
 
-export default function App() {
+// --- Chrome等でのクラッシュ（画面ホワイトアウト）を防ぐためのErrorBoundaryコンポーネント ---
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("アプリケーションエラーを検知しました:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={styles.errorContainer}>
+          <div style={styles.errorBox}>
+            <h2>画面の表示中にエラーが発生しました</h2>
+            <p style={{ fontSize: '13px', color: '#666', margin: '10px 0 20px' }}>
+              お使いのブラウザ環境で一時的な問題が発生した可能性があります。下のボタンより再読み込みしてください。
+            </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              style={styles.primaryButton}
+            >
+              ページを再読み込みする
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function AppWrapper() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  )
+}
+
+function App() {
   const [session, setSession] = useState(null)
   const [authMode, setAuthMode] = useState('login')
   const [email, setEmail] = useState('')
@@ -110,19 +156,26 @@ export default function App() {
   }, [session, currentDate])
 
   const formatDateKey = (date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
+    try {
+      const d = new Date(date)
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    } catch (e) {
+      console.error("日付フォーマットエラー:", e)
+      return ''
+    }
   }
 
   const fetchMonthData = async () => {
-    const year = currentDate.getFullYear()
-    const month = currentDate.getMonth()
-    const startDateStr = formatDateKey(new Date(year, month, 1))
-    const endDateStr = formatDateKey(new Date(year, month + 1, 0))
-
+    if (!session || !currentDate) return
     try {
+      const year = currentDate.getFullYear()
+      const month = currentDate.getMonth()
+      const startDateStr = formatDateKey(new Date(year, month, 1))
+      const endDateStr = formatDateKey(new Date(year, month + 1, 0))
+
       const q = query(
         collection(db, 'daily_tasks'),
         where('user_id', '==', session.uid),
@@ -133,7 +186,7 @@ export default function App() {
       const map = {}
       querySnapshot.forEach((docSnap) => {
         const data = docSnap.data()
-        if (data.date) {
+        if (data && data.date) {
           map[data.date] = data
         }
       })
@@ -145,7 +198,7 @@ export default function App() {
 
   // 選択日のデータ取得
   useEffect(() => {
-    if (session && viewMode === 'day') {
+    if (session && viewMode === 'day' && selectedDate) {
       fetchDayData(selectedDate)
     }
   }, [selectedDate, viewMode, session])
@@ -160,10 +213,11 @@ export default function App() {
       user_name: ''
     })
 
-    const dateKey = formatDateKey(date)
-    const docId = `${session.uid}_${dateKey}`
-    
     try {
+      const dateKey = formatDateKey(date)
+      if (!dateKey) return
+      const docId = `${session.uid}_${dateKey}`
+      
       const docRef = doc(db, 'daily_tasks', docId)
       const docSnap = await getDoc(docRef)
 
@@ -185,16 +239,21 @@ export default function App() {
       }
     } catch (error) {
       console.error("日データ取得エラー:", error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const isFutureDate = (date) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const target = new Date(date)
-    target.setHours(0, 0, 0, 0)
-    return target > today
+    try {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const target = new Date(date)
+      target.setHours(0, 0, 0, 0)
+      return target > today
+    } catch (e) {
+      return false
+    }
   }
 
   const handleCheckboxChange = (index) => {
@@ -238,10 +297,11 @@ export default function App() {
   }
 
   const saveDayData = async (taskToSave) => {
-    const dateKey = formatDateKey(selectedDate)
-    const docId = `${session.uid}_${dateKey}`
-
     try {
+      const dateKey = formatDateKey(selectedDate)
+      if (!dateKey) return
+      const docId = `${session.uid}_${dateKey}`
+
       await setDoc(doc(db, 'daily_tasks', docId), {
         user_id: session.uid,
         user_name: taskToSave.user_name,
@@ -265,43 +325,55 @@ export default function App() {
   }
 
   const changeDay = (days) => {
-    const newDate = new Date(selectedDate)
-    newDate.setDate(newDate.getDate() + days)
-    setSelectedDate(newDate)
+    try {
+      const newDate = new Date(selectedDate)
+      newDate.setDate(newDate.getDate() + days)
+      setSelectedDate(newDate)
+    } catch (e) {
+      console.error("日付変更エラー:", e)
+    }
   }
 
   const changeMonth = (months) => {
-    const newDate = new Date(currentDate)
-    newDate.setMonth(newDate.getMonth() + months)
-    setCurrentDate(newDate)
+    try {
+      const newDate = new Date(currentDate)
+      newDate.setMonth(newDate.getMonth() + months)
+      setCurrentDate(newDate)
+    } catch (e) {
+      console.error("月変更エラー:", e)
+    }
   }
 
   // スワイプイベントの安全なハンドラー
   const handleTouchStart = (e) => {
-    if (e.touches && e.touches[0]) {
+    if (e && e.touches && e.touches[0]) {
       touchStartX.current = e.touches[0].clientX
     }
   }
 
   const handleTouchMove = (e) => {
-    if (e.touches && e.touches[0]) {
+    if (e && e.touches && e.touches[0]) {
       touchEndX.current = e.touches[0].clientX
     }
   }
 
   const handleTouchEnd = (e, onLeftSwipe, onRightSwipe) => {
-    if (e.changedTouches && e.changedTouches[0]) {
-      touchEndX.current = e.changedTouches[0].clientX
-    }
-    const distance = touchStartX.current - touchEndX.current
-    const threshold = 50
-
-    if (Math.abs(distance) > threshold) {
-      if (distance > 0) {
-        onLeftSwipe()
-      } else {
-        onRightSwipe()
+    try {
+      if (e && e.changedTouches && e.changedTouches[0]) {
+        touchEndX.current = e.changedTouches[0].clientX
       }
+      const distance = touchStartX.current - touchEndX.current
+      const threshold = 50
+
+      if (Math.abs(distance) > threshold) {
+        if (distance > 0) {
+          onLeftSwipe()
+        } else {
+          onRightSwipe()
+        }
+      }
+    } catch (err) {
+      console.error("スワイプ処理エラー:", err)
     }
   }
 
@@ -447,9 +519,14 @@ export default function App() {
                   days.push(
                     <div
                       key={dateKey}
-                      onClick={() => {
-                        setSelectedDate(dateObj)
-                        setViewMode('day')
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        try {
+                          setSelectedDate(dateObj)
+                          setViewMode('day')
+                        } catch (err) {
+                          console.error("日表示切り替えエラー:", err)
+                        }
                       }}
                       style={{
                         ...styles.dayCell,
@@ -499,7 +576,11 @@ export default function App() {
               <button 
                 onClick={(e) => {
                   e.stopPropagation()
-                  setViewMode('month')
+                  try {
+                    setViewMode('month')
+                  } catch (err) {
+                    console.error("月カレンダー戻るエラー:", err)
+                  }
                 }} 
                 style={styles.secondaryButton}
               >
@@ -715,5 +796,8 @@ const styles = {
 
   noteSection: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' },
   noteLabel: { fontSize: '14px', fontWeight: 'bold' },
-  textarea: { padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px', width: '100%', resize: 'vertical' }
+  textarea: { padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px', width: '100%', resize: 'vertical' },
+
+  errorContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8f9fa' },
+  errorBox: { background: '#fff', padding: '30px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', width: '380px', textAlign: 'center' }
 }

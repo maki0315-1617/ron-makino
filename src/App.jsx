@@ -277,7 +277,7 @@ export default function App() {
     setCurrentDate(newDate)
   }
 
-  // スワイプイベントのハンドラー
+  // スワイプイベントのハンドラー改善
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX
   }
@@ -286,7 +286,10 @@ export default function App() {
     touchEndX.current = e.touches[0].clientX
   }
 
-  const handleTouchEnd = (onLeftSwipe, onRightSwipe) => {
+  const handleTouchEnd = (e, onLeftSwipe, onRightSwipe) => {
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      touchEndX.current = e.changedTouches[0].clientX
+    }
     const distance = touchStartX.current - touchEndX.current
     const threshold = 50 // スワイプと判定する最小の移動距離（px）
 
@@ -371,7 +374,7 @@ export default function App() {
           <div
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
-            onTouchEnd={() => handleTouchEnd(() => changeMonth(1), () => changeMonth(-1))}
+            onTouchEnd={(e) => handleTouchEnd(e, () => changeMonth(1), () => changeMonth(-1))}
           >
             <div style={styles.navHeader}>
               <button onClick={() => changeMonth(-1)} style={styles.iconButton}><ChevronLeft /></button>
@@ -483,7 +486,7 @@ export default function App() {
           <div
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
-            onTouchEnd={() => handleTouchEnd(() => changeDay(1), () => changeDay(-1))}
+            onTouchEnd={(e) => handleTouchEnd(e, () => changeDay(1), () => changeDay(-1))}
           >
             <div style={styles.navHeader}>
               <button onClick={() => changeDay(-1)} style={styles.navButton}><ChevronLeft /> 前日</button>

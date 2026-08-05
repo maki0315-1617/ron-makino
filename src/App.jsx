@@ -430,8 +430,8 @@ export default function App() {
                       <div style={styles.cellInfo}>
                         {checkedCount > 0 ? (
                           <>
-                            <span style={styles.badgeCheck}>チェック: {checkedCount}</span>
-                            <span style={styles.badgeGram}>合計: {sumGrams}g</span>
+                            <span style={styles.badgeCheck}>{checkedCount}</span>
+                            <span style={styles.badgeGram}>{sumGrams}g</span>
                           </>
                         ) : (
                           <span style={{ color: '#aaa', fontSize: '10px' }}>未記録</span>
@@ -474,7 +474,7 @@ export default function App() {
 
             {loading ? <p>読み込み中...</p> : (
               <div style={styles.card}>
-                <h3>作業チェック項目</h3>
+                <h3>ロンの一日</h3>
                 
                 {/* 項目1 */}
                 <div style={styles.taskRow}>
@@ -486,7 +486,7 @@ export default function App() {
                       disabled={isFutureDate(selectedDate)}
                       style={styles.checkbox}
                     />
-                    作業項目 1
+                    朝
                   </label>
                   <div style={styles.rowInputs}>
                     <span>時分:</span>
@@ -525,7 +525,7 @@ export default function App() {
                       disabled={isFutureDate(selectedDate)}
                       style={styles.checkbox}
                     />
-                    作業項目 2
+                    昼
                   </label>
                   <div style={styles.rowInputs}>
                     <span>時分:</span>
@@ -564,7 +564,7 @@ export default function App() {
                       disabled={isFutureDate(selectedDate)}
                       style={styles.checkbox}
                     />
-                    作業項目 3
+                    夜
                   </label>
                   <div style={styles.rowInputs}>
                     <span>時分:</span>
@@ -599,7 +599,7 @@ export default function App() {
                 </div>
 
                 <div style={styles.noteSection}>
-                  <label style={styles.noteLabel}>メモ・コメント（複数行入力可能）：</label>
+                  <label style={styles.noteLabel}>ロンの気づいたことを入力して下さい：</label>
                   <textarea
                     value={currentTask.note}
                     onChange={(e) => handleFieldChange('note', e.target.value)}

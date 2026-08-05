@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react'
-import { auth, db } from './firebase'
+import { auth, db } from './firebase' // storageは不要なため削除
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -15,7 +15,7 @@ import {
   where, 
   getDocs 
 } from 'firebase/firestore'
-import { ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LogOut, User, Image as ImageIcon, Trash2 } from 'lucide-react'
 
 // --- Chrome等でのクラッシュ（画面ホワイトアウト）を防ぐためのErrorBoundaryコンポーネント ---
 class ErrorBoundary extends Component {
@@ -81,9 +81,12 @@ function App() {
     check2: false, time2: '', gram2: 15,
     check3: false, time3: '', gram3: 15,
     note: '',
-    user_name: ''
+    user_name: '',
+    images: [] // Base64形式の文字列の配列を保持
   })
   const [loading, setLoading] = useState(false)
+  const [imageError, setImageError] = useState('')
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   // スワイプ検出用の座標記録用Ref
   const touchStartX = useRef(0)
@@ -205,12 +208,14 @@ function App() {
 
   const fetchDayData = async (date) => {
     setLoading(true)
+    setImageError('')
     setCurrentTask({
       check1: false, time1: '', gram1: 15,
       check2: false, time2: '', gram2: 15,
       check3: false, time3: '', gram3: 15,
       note: '',
-      user_name: ''
+      user_name: '',
+      images: []
     })
 
     try {
@@ -234,7 +239,8 @@ function App() {
           time3: data.time3 || '',
           gram3: data.gram3 !== undefined ? data.gram3 : 15,
           note: data.note || '',
-          user_name: data.user_name || ''
+          user_name: data.user_name || '',
+          images: data.images || []
         })
       }
     } catch (error) {
@@ -296,6 +302,119 @@ function App() {
     saveDayData(updated)
   }
 
+  // 画像を読み込んでリサイズ（圧縮）し、Base64文字列に変換するヘルパー関数
+  const resizeAndConvertImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = (event) => {
+        const img = new Image()
+        img.src = event.target.result
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const MAX_WIDTH = 600 // 最大幅 600px に制限
+          const MAX_HEIGHT = 600
+          let width = img.width
+          let height = img.height
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width
+              width = MAX_WIDTH
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height
+              height = MAX_HEIGHT
+            }
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, width, height)
+
+          // JPEG形式、品質 0.6 で圧縮してBase64に変換
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6)
+          resolve(dataUrl)
+        }
+        img.onerror = (err) => reject(err)
+      }
+      reader.onerror = (err) => reject(err)
+    })
+  }
+
+  // 画像アップロード処理（Firestore保存用）
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setImageError('')
+
+    // 1. 枚数制限チェック（最大3枚）
+    const currentImages = currentTask.images || []
+    if (currentImages.length >= 3) {
+      setImageError('画像は最大3枚までです。')
+      e.target.value = ''
+      return
+    }
+
+    // 2. ファイル形式チェック（JPGのみ）
+    if (file.type !== 'image/jpeg' && file.type !== 'image/jpg') {
+      setImageError('ファイル形式はJPG（.jpg / .jpeg）のみアップロード可能です。')
+      e.target.value = ''
+      return
+    }
+
+    // 3. ファイルサイズチェック（元ファイルが大きすぎる場合の保険として5MB以下をチェック）
+    const maxSize = 5 * 1024 * 1024 
+    if (file.size > maxSize) {
+      setImageError('ファイルサイズが大きすぎます。5MB以下の画像を選択してください。')
+      e.target.value = ''
+      return
+    }
+
+    setUploadingImage(true)
+    try {
+      // 画像を圧縮してBase64に変換
+      const base64Image = await resizeAndConvertImage(file)
+
+      const updatedImages = [...currentImages, base64Image]
+      const updated = {
+        ...currentTask,
+        images: updatedImages,
+        user_name: session.email
+      }
+
+      setCurrentTask(updated)
+      await saveDayData(updated)
+    } catch (error) {
+      console.error("画像処理エラー:", error)
+      setImageError('画像の読み込み・圧縮に失敗しました。')
+    } finally {
+      setUploadingImage(false)
+      e.target.value = ''
+    }
+  }
+
+  // 画像削除処理
+  const handleImageDelete = async (indexToRemove) => {
+    if (!window.confirm('この画像を削除しますか？')) return
+    try {
+      const updatedImages = (currentTask.images || []).filter((_, idx) => idx !== indexToRemove)
+      const updated = {
+        ...currentTask,
+        images: updatedImages,
+        user_name: session.email
+      }
+
+      setCurrentTask(updated)
+      await saveDayData(updated)
+    } catch (error) {
+      console.error("画像削除エラー:", error)
+      setImageError('画像の削除に失敗しました。')
+    }
+  }
+
   const saveDayData = async (taskToSave) => {
     try {
       const dateKey = formatDateKey(selectedDate)
@@ -316,6 +435,7 @@ function App() {
         time3: taskToSave.time3,
         gram3: Number(taskToSave.gram3),
         note: taskToSave.note,
+        images: taskToSave.images || [], // 圧縮された画像データを保存
         updated_at: new Date()
       })
       fetchMonthData()
@@ -735,6 +855,53 @@ function App() {
                     placeholder="作業の詳細や気付いたことを入力してください..."
                   />
                 </div>
+
+                {/* 画像投稿セクション（Firestore保存対応・圧縮機能付き） */}
+                <div style={styles.imageSection}>
+                  <label style={styles.noteLabel}>
+                    <ImageIcon size={16} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                    写真を追加する (JPG / 最大3枚):
+                  </label>
+                  
+                  {imageError && <p style={styles.errorText}>{imageError}</p>}
+
+                  <div style={styles.imageUploadArea}>
+                    {(currentTask.images || []).length < 3 && !isFutureDate(selectedDate) && (
+                      <label style={styles.fileUploadButton}>
+                        {uploadingImage ? '処理中...' : '画像を選択'}
+                        <input
+                          type="file"
+                          accept=".jpg, .jpeg"
+                          onChange={handleImageUpload}
+                          style={{ display: 'none' }}
+                          disabled={uploadingImage}
+                        />
+                      </label>
+                    )}
+                    <span style={styles.imageCountText}>
+                      ({(currentTask.images || []).length}/3枚)
+                    </span>
+                  </div>
+
+                  {/* プレビュー表示 */}
+                  <div style={styles.imagePreviewContainer}>
+                    {(currentTask.images || []).map((base64Url, idx) => (
+                      <div key={idx} style={styles.imagePreviewWrapper}>
+                        <img src={base64Url} alt={`アップロード画像 ${idx + 1}`} style={styles.previewImage} />
+                        {!isFutureDate(selectedDate) && (
+                          <button
+                            type="button"
+                            onClick={() => handleImageDelete(idx)}
+                            style={styles.imageDeleteButton}
+                            title="画像を削除"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -797,6 +964,16 @@ const styles = {
   noteSection: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' },
   noteLabel: { fontSize: '14px', fontWeight: 'bold' },
   textarea: { padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px', width: '100%', resize: 'vertical' },
+
+  imageSection: { marginTop: '20px', borderTop: '1px solid #f1f3f5', paddingTop: '15px' },
+  imageUploadArea: { display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' },
+  fileUploadButton: { display: 'inline-block', padding: '6px 12px', background: '#28a745', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' },
+  imageCountText: { fontSize: '13px', color: '#666' },
+  errorText: { color: 'red', fontSize: '12px', marginTop: '4px' },
+  imagePreviewContainer: { display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' },
+  imagePreviewWrapper: { position: 'relative', width: '80px', height: '80px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #ccc' },
+  previewImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  imageDeleteButton: { position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 },
 
   errorContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8f9fa' },
   errorBox: { background: '#fff', padding: '30px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', width: '380px', textAlign: 'center' }

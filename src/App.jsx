@@ -83,7 +83,6 @@ export default function App() {
       }
     }
 
-    // 登録者宛と管理者宛の送信
     await sendMail(userEmail, 'ようこそ、ロン大好きに登録いただきありがとうございます！')
     await sendMail('ronron201907@gmail.com', `新しいユーザーが登録されました: ${userEmail}`)
   }
@@ -277,28 +276,30 @@ export default function App() {
     setCurrentDate(newDate)
   }
 
-  // スワイプイベントのハンドラー改善
+  // スワイプイベントの安全なハンドラー
   const handleTouchStart = (e) => {
-    touchStartX.current = e.touches[0].clientX
+    if (e.touches && e.touches[0]) {
+      touchStartX.current = e.touches[0].clientX
+    }
   }
 
   const handleTouchMove = (e) => {
-    touchEndX.current = e.touches[0].clientX
+    if (e.touches && e.touches[0]) {
+      touchEndX.current = e.touches[0].clientX
+    }
   }
 
   const handleTouchEnd = (e, onLeftSwipe, onRightSwipe) => {
-    if (e.changedTouches && e.changedTouches.length > 0) {
+    if (e.changedTouches && e.changedTouches[0]) {
       touchEndX.current = e.changedTouches[0].clientX
     }
     const distance = touchStartX.current - touchEndX.current
-    const threshold = 50 // スワイプと判定する最小の移動距離（px）
+    const threshold = 50
 
     if (Math.abs(distance) > threshold) {
       if (distance > 0) {
-        // 左方向スワイプ（翌月 / 翌日）
         onLeftSwipe()
       } else {
-        // 右方向スワイプ（前月 / 前日）
         onRightSwipe()
       }
     }
@@ -495,7 +496,13 @@ export default function App() {
             </div>
 
             <div style={styles.topSubBar}>
-              <button onClick={() => setViewMode('month')} style={styles.secondaryButton}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setViewMode('month')
+                }} 
+                style={styles.secondaryButton}
+              >
                 月カレンダーに戻る
               </button>
               {currentTask.user_name && (

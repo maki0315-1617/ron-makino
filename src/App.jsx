@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { auth, db } from './firebase'
 import { 
   signInWithEmailAndPassword, 
@@ -38,6 +38,10 @@ export default function App() {
     user_name: ''
   })
   const [loading, setLoading] = useState(false)
+
+  // スワイプ検出用の座標記録用Ref
+  const touchStartX = useRef(0)
+  const touchEndX = useRef(0)
 
   // 認証状態の監視
   useEffect(() => {
@@ -273,6 +277,30 @@ export default function App() {
     setCurrentDate(newDate)
   }
 
+  // スワイプイベントのハンドラー
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  const handleTouchMove = (e) => {
+    touchEndX.current = e.touches[0].clientX
+  }
+
+  const handleTouchEnd = (onLeftSwipe, onRightSwipe) => {
+    const distance = touchStartX.current - touchEndX.current
+    const threshold = 50 // スワイプと判定する最小の移動距離（px）
+
+    if (Math.abs(distance) > threshold) {
+      if (distance > 0) {
+        // 左方向スワイプ（翌月 / 翌日）
+        onLeftSwipe()
+      } else {
+        // 右方向スワイプ（前月 / 前日）
+        onRightSwipe()
+      }
+    }
+  }
+
   const totalGrams = (
     (currentTask.check1 ? Number(currentTask.gram1 || 0) : 0) +
     (currentTask.check2 ? Number(currentTask.gram2 || 0) : 0) +
@@ -340,7 +368,11 @@ export default function App() {
 
       <main style={styles.main}>
         {viewMode === 'month' ? (
-          <div>
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={() => handleTouchEnd(() => changeMonth(1), () => changeMonth(-1))}
+          >
             <div style={styles.navHeader}>
               <button onClick={() => changeMonth(-1)} style={styles.iconButton}><ChevronLeft /></button>
               <h2>{currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月</h2>
@@ -448,7 +480,11 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <div>
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={() => handleTouchEnd(() => changeDay(1), () => changeDay(-1))}
+          >
             <div style={styles.navHeader}>
               <button onClick={() => changeDay(-1)} style={styles.navButton}><ChevronLeft /> 前日</button>
               <h2>{selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月 {selectedDate.getDate()}日</h2>

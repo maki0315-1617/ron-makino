@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react'
-import { auth, db } from './firebase' // storageは不要なため削除
+import { auth, db } from './firebase'
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -15,7 +15,7 @@ import {
   where, 
   getDocs 
 } from 'firebase/firestore'
-import { ChevronLeft, ChevronRight, LogOut, User, Image as ImageIcon, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LogOut, User, Image as ImageIcon, Trash2, X, ZoomIn } from 'lucide-react'
 
 // --- Chrome等でのクラッシュ（画面ホワイトアウト）を防ぐためのErrorBoundaryコンポーネント ---
 class ErrorBoundary extends Component {
@@ -82,11 +82,14 @@ function App() {
     check3: false, time3: '', gram3: 15,
     note: '',
     user_name: '',
-    images: [] // Base64形式の文字列の配列を保持
+    images: []
   })
   const [loading, setLoading] = useState(false)
   const [imageError, setImageError] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
+
+  // 画像拡大モーダル用のステート
+  const [modalImage, setModalImage] = useState(null)
 
   // スワイプ検出用の座標記録用Ref
   const touchStartX = useRef(0)
@@ -302,7 +305,7 @@ function App() {
     saveDayData(updated)
   }
 
-  // 画像を読み込んでリサイズ（圧縮）し、Base64文字列に変換するヘルパー関数
+  // 画像を読み込んでリサイズし、Base64文字列に変換する関数
   const resizeAndConvertImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -312,8 +315,8 @@ function App() {
         img.src = event.target.result
         img.onload = () => {
           const canvas = document.createElement('canvas')
-          const MAX_WIDTH = 600 // 最大幅 600px に制限
-          const MAX_HEIGHT = 600
+          const MAX_WIDTH = 800 // 少し解像度を上げて綺麗に表示
+          const MAX_HEIGHT = 800
           let width = img.width
           let height = img.height
 
@@ -334,8 +337,7 @@ function App() {
           const ctx = canvas.getContext('2d')
           ctx.drawImage(img, 0, 0, width, height)
 
-          // JPEG形式、品質 0.6 で圧縮してBase64に変換
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
           resolve(dataUrl)
         }
         img.onerror = (err) => reject(err)
@@ -344,13 +346,11 @@ function App() {
     })
   }
 
-  // 画像アップロード処理（Firestore保存用）
   const handleImageUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
     setImageError('')
 
-    // 1. 枚数制限チェック（最大3枚）
     const currentImages = currentTask.images || []
     if (currentImages.length >= 3) {
       setImageError('画像は最大3枚までです。')
@@ -358,14 +358,12 @@ function App() {
       return
     }
 
-    // 2. ファイル形式チェック（JPGのみ）
     if (file.type !== 'image/jpeg' && file.type !== 'image/jpg') {
       setImageError('ファイル形式はJPG（.jpg / .jpeg）のみアップロード可能です。')
       e.target.value = ''
       return
     }
 
-    // 3. ファイルサイズチェック（元ファイルが大きすぎる場合の保険として5MB以下をチェック）
     const maxSize = 5 * 1024 * 1024 
     if (file.size > maxSize) {
       setImageError('ファイルサイズが大きすぎます。5MB以下の画像を選択してください。')
@@ -375,9 +373,7 @@ function App() {
 
     setUploadingImage(true)
     try {
-      // 画像を圧縮してBase64に変換
       const base64Image = await resizeAndConvertImage(file)
-
       const updatedImages = [...currentImages, base64Image]
       const updated = {
         ...currentTask,
@@ -396,7 +392,6 @@ function App() {
     }
   }
 
-  // 画像削除処理
   const handleImageDelete = async (indexToRemove) => {
     if (!window.confirm('この画像を削除しますか？')) return
     try {
@@ -435,7 +430,7 @@ function App() {
         time3: taskToSave.time3,
         gram3: Number(taskToSave.gram3),
         note: taskToSave.note,
-        images: taskToSave.images || [], // 圧縮された画像データを保存
+        images: taskToSave.images || [],
         updated_at: new Date()
       })
       fetchMonthData()
@@ -464,7 +459,6 @@ function App() {
     }
   }
 
-  // スワイプイベントの安全なハンドラー
   const handleTouchStart = (e) => {
     if (e && e.touches && e.touches[0]) {
       touchStartX.current = e.touches[0].clientX
@@ -856,7 +850,7 @@ function App() {
                   />
                 </div>
 
-                {/* 画像投稿セクション（Firestore保存対応・圧縮機能付き） */}
+                {/* 画像投稿セクション */}
                 <div style={styles.imageSection}>
                   <label style={styles.noteLabel}>
                     <ImageIcon size={16} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
@@ -883,15 +877,28 @@ function App() {
                     </span>
                   </div>
 
-                  {/* プレビュー表示 */}
+                  {/* プレビュー表示（拡大ボタン・クリック対応） */}
                   <div style={styles.imagePreviewContainer}>
                     {(currentTask.images || []).map((base64Url, idx) => (
-                      <div key={idx} style={styles.imagePreviewWrapper}>
+                      <div 
+                        key={idx} 
+                        style={styles.imagePreviewWrapper}
+                        onClick={() => setModalImage(base64Url)} // サムネイルクリックで拡大
+                      >
                         <img src={base64Url} alt={`アップロード画像 ${idx + 1}`} style={styles.previewImage} />
+                        
+                        {/* ホバー時またはスマホで分かりやすい拡大アイコンのオーバーレイ */}
+                        <div style={styles.zoomOverlay}>
+                          <ZoomIn size={18} color="#fff" />
+                        </div>
+
                         {!isFutureDate(selectedDate) && (
                           <button
                             type="button"
-                            onClick={() => handleImageDelete(idx)}
+                            onClick={(e) => {
+                              e.stopPropagation() // モーダルが開かないようにイベント伝播を停止
+                              handleImageDelete(idx)
+                            }}
                             style={styles.imageDeleteButton}
                             title="画像を削除"
                           >
@@ -907,6 +914,22 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* 画像拡大モーダル */}
+      {modalImage && (
+        <div style={styles.modalOverlay} onClick={() => setModalImage(null)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <button 
+              style={styles.modalCloseButton} 
+              onClick={() => setModalImage(null)}
+              title="閉じる"
+            >
+              <X size={20} />
+            </button>
+            <img src={modalImage} alt="拡大表示" style={styles.modalImage} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -971,9 +994,16 @@ const styles = {
   imageCountText: { fontSize: '13px', color: '#666' },
   errorText: { color: 'red', fontSize: '12px', marginTop: '4px' },
   imagePreviewContainer: { display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' },
-  imagePreviewWrapper: { position: 'relative', width: '80px', height: '80px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #ccc' },
+  imagePreviewWrapper: { position: 'relative', width: '80px', height: '80px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #ccc', cursor: 'pointer' },
   previewImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  imageDeleteButton: { position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 },
+  zoomOverlay: { position: 'absolute', bottom: '2px', left: '2px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  imageDeleteButton: { position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, zIndex: 2 },
+
+  // モーダル用スタイル
+  modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' },
+  modalContent: { position: 'relative', maxWidth: '90%', maxHeight: '90%', display: 'flex', justifyContent: 'center', alignItems: 'center' },
+  modalImage: { maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' },
+  modalCloseButton: { position: 'absolute', top: '-40px', right: '0', background: '#fff', color: '#333', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' },
 
   errorContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8f9fa' },
   errorBox: { background: '#fff', padding: '30px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', width: '380px', textAlign: 'center' }

@@ -904,7 +904,7 @@ function App() {
                       <div 
                         key={idx} 
                         style={styles.imagePreviewWrapper}
-                        onClick={() => setModalIndex(idx)} // クリックしたインデックスで拡大モーダルを開く
+                        onClick={() => setModalIndex(idx)}
                       >
                         <img src={base64Url} alt={`アップロード画像 ${idx + 1}`} style={styles.previewImage} />
                         
@@ -1064,13 +1064,13 @@ const styles = {
   zoomOverlay: { position: 'absolute', bottom: '2px', left: '2px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   imageDeleteButton: { position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, zIndex: 2 },
 
-  // モーダル用スタイ
+  // モーダル用スタイル
   modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' },
   modalContent: { position: 'relative', maxWidth: '90%', maxHeight: '90%', display: 'flex', justifyContent: 'center', alignItems: 'center' },
   modalImageContainer: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   modalImage: { maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' },
   modalCloseButton: { position: 'absolute', top: '-45px', right: '0', background: '#fff', color: '#333', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 10 },
-  modalNavButton: { position: 'absolute', top: '50%', transform: 'translateY(-50Kx)', background: 'rgba(255,255,255,0.8)', color: '#333', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 10 },
+  modalNavButton: { position: 'absolute', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.8)', color: '#333', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 10 },
   modalPagination: { marginTop: '10px', color: '#fff', fontSize: '14px', background: 'rgba(0,0,0,0.6)', padding: '4px 12px', borderRadius: '12px' },
 
   errorContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8f9fa' },

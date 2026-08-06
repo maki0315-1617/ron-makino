@@ -922,7 +922,7 @@ function App() {
                             style={styles.imageDeleteButton}
                             title="画像を削除"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={16} color="#fff" />
                           </button>
                         )}
                       </div>
@@ -1058,11 +1058,13 @@ const styles = {
   fileUploadButton: { display: 'inline-block', padding: '6px 12px', background: '#28a745', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' },
   imageCountText: { fontSize: '13px', color: '#666' },
   errorText: { color: 'red', fontSize: '12px', marginTop: '4px' },
-  imagePreviewContainer: { display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' },
-  imagePreviewWrapper: { position: 'relative', width: '80px', height: '80px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #ccc', cursor: 'pointer' },
+  imagePreviewContainer: { display: 'flex', gap: '12px', marginTop: '10px', flexWrap: 'wrap' },
+  // スマホで押しやすくプレビューサイズを少し大きく調整 (80px -> 88px)
+  imagePreviewWrapper: { position: 'relative', width: '88px', height: '88px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #ccc', cursor: 'pointer' },
   previewImage: { width: '100%', height: '100%', objectFit: 'cover' },
   zoomOverlay: { position: 'absolute', bottom: '2px', left: '2px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  imageDeleteButton: { position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, zIndex: 2 },
+  // スマホでも押しやすいように削除ボタンを大きく変更（20px -> 30px、視認性の高い赤背景に変更）
+  imageDeleteButton: { position: 'absolute', top: '4px', right: '4px', background: 'rgba(220, 53, 69, 0.9)', color: '#fff', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, zIndex: 2, boxShadow: '0 2px 5px rgba(0,0,0,0.3)' },
 
   // モーダル用スタイル
   modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' },

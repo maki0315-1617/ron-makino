@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, LogOut, User, Image as ImageIcon, Trash2, X, ZoomIn } from 'lucide-react'
 
-// --- Chrome等でのクラッシュ（画面ホワイトアウト）を防ぐためのErrorBoundaryコンポーネント ---
+// --- Chrome等でのクラッシュを防ぐためのErrorBoundaryコンポーネント ---
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -88,12 +88,14 @@ function App() {
   const [imageError, setImageError] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
 
-  // 画像拡大モーダル用のステート
-  const [modalImage, setModalImage] = useState(null)
+  // 画像拡大モーダル用のステート（選択中の画像のインデックスを管理）
+  const [modalIndex, setModalIndex] = useState(null)
 
   // スワイプ検出用の座標記録用Ref
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
+  const modalTouchStartX = useRef(0)
+  const modalTouchEndX = useRef(0)
 
   // 認証状態の監視
   useEffect(() => {
@@ -103,7 +105,6 @@ function App() {
     return () => unsubscribe()
   }, [])
 
-  // EmailJSのREST API（fetch）を使ったメール送信関数
   const sendWelcomeEmail = async (userEmail) => {
     const SERVICE_ID = 'YOUR_SERVICE_ID'
     const TEMPLATE_ID = 'YOUR_TEMPLATE_ID'
@@ -111,7 +112,7 @@ function App() {
 
     const sendMail = async (recipientEmail, messageText) => {
       try {
-        const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        await fetch('https://api.emailjs.com/api/v1.0/email/send', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -127,11 +128,8 @@ function App() {
             }
           })
         })
-        if (!response.ok) {
-          console.warn("メール送信レスポンスエラー:", await response.text())
-        }
       } catch (mailError) {
-        console.warn("ウェルカムメールの送信に失敗しましたが、処理は継続します:", mailError)
+        console.warn("メール送信失敗:", mailError)
       }
     }
 
@@ -154,7 +152,6 @@ function App() {
     }
   }
 
-  // 月カレンダー用のデータ取得
   useEffect(() => {
     if (session) {
       fetchMonthData()
@@ -169,7 +166,6 @@ function App() {
       const day = String(d.getDate()).padStart(2, '0')
       return `${year}-${month}-${day}`
     } catch (e) {
-      console.error("日付フォーマットエラー:", e)
       return ''
     }
   }
@@ -202,7 +198,6 @@ function App() {
     }
   }
 
-  // 選択日のデータ取得
   useEffect(() => {
     if (session && viewMode === 'day' && selectedDate) {
       fetchDayData(selectedDate)
@@ -305,7 +300,6 @@ function App() {
     saveDayData(updated)
   }
 
-  // 画像を読み込んでリサイズし、Base64文字列に変換する関数
   const resizeAndConvertImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -315,7 +309,7 @@ function App() {
         img.src = event.target.result
         img.onload = () => {
           const canvas = document.createElement('canvas')
-          const MAX_WIDTH = 800 // 少し解像度を上げて綺麗に表示
+          const MAX_WIDTH = 800
           const MAX_HEIGHT = 800
           let width = img.width
           let height = img.height
@@ -491,6 +485,42 @@ function App() {
     }
   }
 
+  // モーダル内の画像切り替え用スワイプハンドラ
+  const handleModalTouchStart = (e) => {
+    if (e && e.touches && e.touches[0]) {
+      modalTouchStartX.current = e.touches[0].clientX
+    }
+  }
+
+  const handleModalTouchMove = (e) => {
+    if (e && e.touches && e.touches[0]) {
+      modalTouchEndX.current = e.touches[0].clientX
+    }
+  }
+
+  const handleModalTouchEnd = (e) => {
+    try {
+      if (e && e.changedTouches && e.changedTouches[0]) {
+        modalTouchEndX.current = e.changedTouches[0].clientX
+      }
+      const distance = modalTouchStartX.current - modalTouchEndX.current
+      const threshold = 50
+      const imagesCount = (currentTask.images || []).length
+
+      if (Math.abs(distance) > threshold) {
+        if (distance > 0) {
+          // 左スワイプ -> 次の画像へ
+          setModalIndex((prev) => (prev < imagesCount - 1 ? prev + 1 : prev))
+        } else {
+          // 右スワイプ -> 前の画像へ
+          setModalIndex((prev) => (prev > 0 ? prev - 1 : prev))
+        }
+      }
+    } catch (err) {
+      console.error("モーダルスワイプエラー:", err)
+    }
+  }
+
   const totalGrams = (
     (currentTask.check1 ? Number(currentTask.gram1 || 0) : 0) +
     (currentTask.check2 ? Number(currentTask.gram2 || 0) : 0) +
@@ -602,18 +632,9 @@ function App() {
                   let sumGrams = 0
 
                   if (taskData) {
-                    if (taskData.check1) { 
-                      checkedCount++; 
-                      sumGrams += Number(taskData.gram1 || 0); 
-                    }
-                    if (taskData.check2) { 
-                      checkedCount++; 
-                      sumGrams += Number(taskData.gram2 || 0); 
-                    }
-                    if (taskData.check3) { 
-                      checkedCount++; 
-                      sumGrams += Number(taskData.gram3 || 0); 
-                    }
+                    if (taskData.check1) { checkedCount++; sumGrams += Number(taskData.gram1 || 0); }
+                    if (taskData.check2) { checkedCount++; sumGrams += Number(taskData.gram2 || 0); }
+                    if (taskData.check3) { checkedCount++; sumGrams += Number(taskData.gram3 || 0); }
                     if (taskData.note && typeof taskData.note === 'string' && taskData.note.trim() !== '') {
                       hasNote = true
                     }
@@ -877,17 +898,16 @@ function App() {
                     </span>
                   </div>
 
-                  {/* プレビュー表示（拡大ボタン・クリック対応） */}
+                  {/* プレビュー表示 */}
                   <div style={styles.imagePreviewContainer}>
                     {(currentTask.images || []).map((base64Url, idx) => (
                       <div 
                         key={idx} 
                         style={styles.imagePreviewWrapper}
-                        onClick={() => setModalImage(base64Url)} // サムネイルクリックで拡大
+                        onClick={() => setModalIndex(idx)} // クリックしたインデックスで拡大モーダルを開く
                       >
                         <img src={base64Url} alt={`アップロード画像 ${idx + 1}`} style={styles.previewImage} />
                         
-                        {/* ホバー時またはスマホで分かりやすい拡大アイコンのオーバーレイ */}
                         <div style={styles.zoomOverlay}>
                           <ZoomIn size={18} color="#fff" />
                         </div>
@@ -896,7 +916,7 @@ function App() {
                           <button
                             type="button"
                             onClick={(e) => {
-                              e.stopPropagation() // モーダルが開かないようにイベント伝播を停止
+                              e.stopPropagation()
                               handleImageDelete(idx)
                             }}
                             style={styles.imageDeleteButton}
@@ -915,18 +935,63 @@ function App() {
         )}
       </main>
 
-      {/* 画像拡大モーダル */}
-      {modalImage && (
-        <div style={styles.modalOverlay} onClick={() => setModalImage(null)}>
+      {/* スワイプ・ボタン切り替え対応 画像拡大モーダル */}
+      {modalIndex !== null && currentTask.images && currentTask.images[modalIndex] && (
+        <div 
+          style={styles.modalOverlay} 
+          onClick={() => setModalIndex(null)}
+          onTouchStart={handleModalTouchStart}
+          onTouchMove={handleModalTouchMove}
+          onTouchEnd={handleModalTouchEnd}
+        >
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <button 
               style={styles.modalCloseButton} 
-              onClick={() => setModalImage(null)}
+              onClick={() => setModalIndex(null)}
               title="閉じる"
             >
               <X size={20} />
             </button>
-            <img src={modalImage} alt="拡大表示" style={styles.modalImage} />
+
+            {/* 左切り替えボタン（複数枚かつ最初の画像以外の場合） */}
+            {modalIndex > 0 && (
+              <button 
+                style={{ ...styles.modalNavButton, left: '-50px' }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setModalIndex(modalIndex - 1)
+                }}
+                title="前の画像"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+
+            <div style={styles.modalImageContainer}>
+              <img 
+                src={currentTask.images[modalIndex]} 
+                alt={`拡大表示 ${modalIndex + 1}`} 
+                style={styles.modalImage} 
+              />
+              {/* ページネーション（例: 1 / 3） */}
+              <div style={styles.modalPagination}>
+                {modalIndex + 1} / {currentTask.images.length}
+              </div>
+            </div>
+
+            {/* 右切り替えボタン（複数枚かつ最後の画像以外の場合） */}
+            {modalIndex < currentTask.images.length - 1 && (
+              <button 
+                style={{ ...styles.modalNavButton, right: '-50px' }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setModalIndex(modalIndex + 1)
+                }}
+                title="次の画像"
+              >
+                <ChevronRight size={24} />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -999,11 +1064,14 @@ const styles = {
   zoomOverlay: { position: 'absolute', bottom: '2px', left: '2px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   imageDeleteButton: { position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, zIndex: 2 },
 
-  // モーダル用スタイル
-  modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' },
+  // モーダル用スタイ
+  modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' },
   modalContent: { position: 'relative', maxWidth: '90%', maxHeight: '90%', display: 'flex', justifyContent: 'center', alignItems: 'center' },
-  modalImage: { maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' },
-  modalCloseButton: { position: 'absolute', top: '-40px', right: '0', background: '#fff', color: '#333', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' },
+  modalImageContainer: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  modalImage: { maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' },
+  modalCloseButton: { position: 'absolute', top: '-45px', right: '0', background: '#fff', color: '#333', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 10 },
+  modalNavButton: { position: 'absolute', top: '50%', transform: 'translateY(-50Kx)', background: 'rgba(255,255,255,0.8)', color: '#333', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 10 },
+  modalPagination: { marginTop: '10px', color: '#fff', fontSize: '14px', background: 'rgba(0,0,0,0.6)', padding: '4px 12px', borderRadius: '12px' },
 
   errorContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8f9fa' },
   errorBox: { background: '#fff', padding: '30px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', width: '380px', textAlign: 'center' }

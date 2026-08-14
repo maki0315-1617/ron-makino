@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, Component } from 'react'
-import notoSansJpUrl from '@fontsource/noto-sans-jp/files/noto-sans-jp-japanese-400-normal.woff2?url'
 import { auth, db } from './firebase'
 import { 
   signInWithEmailAndPassword, 
@@ -181,7 +180,7 @@ function App() {
     try {
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
-      const monthLabel = `${year}年 ${month + 1}月`
+      const monthLabel = `${year}/${month + 1}`
       const totalDays = new Date(year, month + 1, 0).getDate()
 
       const dayValues = []
@@ -215,16 +214,14 @@ function App() {
       const margin = 40
       const usableWidth = pageWidth - margin * 2
 
-      const fontBuffer = await fetch(notoSansJpUrl).then((response) => response.arrayBuffer())
-      doc.addFont(fontBuffer, 'NotoSansJP', 'normal')
-      doc.setFont('NotoSansJP')
-
       const titleY = 54
       doc.setTextColor(28, 28, 28)
+      doc.setFont('helvetica', 'bold')
       doc.setFontSize(18)
-      doc.text(`${monthLabel} ロン君の記録`, margin, titleY)
+      doc.text(`${monthLabel} Ron Record`, margin, titleY)
 
-      const summaryText = `通常: ${totalNormal}回 / 血: ${totalBlood}回 / 体重平均: ${weightCount ? (totalWeight / weightCount).toFixed(1) : '0.0'}kg`
+      const summaryText = `Normal: ${totalNormal} / Blood: ${totalBlood} / Avg weight: ${weightCount ? (totalWeight / weightCount).toFixed(1) : '0.0'}kg`
+      doc.setFont('helvetica', 'normal')
       doc.setFontSize(11)
       doc.text(summaryText, margin, titleY + 26)
 
@@ -234,9 +231,9 @@ function App() {
 
       const drawLegend = (legendX, legendY) => {
         const entries = [
-          { label: '通常クシャミ', color: [59, 130, 246] },
-          { label: '血のクシャミ', color: [239, 68, 68] },
-          { label: '体重 (kg)', color: [16, 185, 129] }
+          { label: 'Normal sneeze', color: [59, 130, 246] },
+          { label: 'Blood sneeze', color: [239, 68, 68] },
+          { label: 'Weight (kg)', color: [16, 185, 129] }
         ]
 
         entries.forEach((entry, index) => {
@@ -308,9 +305,9 @@ function App() {
       const maxBlood = Math.max(...dayValues.map((d) => d.blood), 1)
       const maxWeight = Math.max(...dayValues.map((d) => (d.weight !== null ? d.weight : 0)), 10)
 
-      drawLineChart({ title: '通常クシャミ', values: dayValues.map((d) => d.normal), color: [59, 130, 246], yMax: maxNormal, yOffset: 0 })
-      drawLineChart({ title: '血のクシャミ', values: dayValues.map((d) => d.blood), color: [239, 68, 68], yMax: maxBlood, yOffset: 120 })
-      drawLineChart({ title: '体重 (kg)', values: dayValues.map((d) => (d.weight !== null ? d.weight : 0)), color: [16, 185, 129], yMax: maxWeight, yOffset: 240 })
+      drawLineChart({ title: 'Normal', values: dayValues.map((d) => d.normal), color: [59, 130, 246], yMax: maxNormal, yOffset: 0 })
+      drawLineChart({ title: 'Blood', values: dayValues.map((d) => d.blood), color: [239, 68, 68], yMax: maxBlood, yOffset: 120 })
+      drawLineChart({ title: 'Weight', values: dayValues.map((d) => (d.weight !== null ? d.weight : 0)), color: [16, 185, 129], yMax: maxWeight, yOffset: 240 })
 
       drawLegend(margin, pageHeight - 70)
 

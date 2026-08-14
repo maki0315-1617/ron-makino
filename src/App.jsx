@@ -83,6 +83,8 @@ function App() {
     note: '',
     sneeze_count: 0,
     blood_sneeze_count: 0,
+    hospital_visit: '',
+    hospital_weight: 6.0,
     user_name: '',
     images: []
   })
@@ -216,6 +218,8 @@ function App() {
       note: '',
       sneeze_count: 0,
       blood_sneeze_count: 0,
+      hospital_visit: '',
+      hospital_weight: 6.0,
       user_name: '',
       images: []
     })
@@ -243,6 +247,8 @@ function App() {
           note: data.note || '',
           sneeze_count: Number(data.sneeze_count || 0),
           blood_sneeze_count: Number(data.blood_sneeze_count || 0),
+          hospital_visit: data.hospital_visit || '',
+          hospital_weight: data.hospital_weight !== undefined ? Number(data.hospital_weight) : 6.0,
           user_name: data.user_name || '',
           images: data.images || []
         })
@@ -310,13 +316,23 @@ function App() {
   }
 
   const handleFieldChange = (field, value) => {
-    if (isFutureDate(selectedDate) && field !== 'note') return
+    const futureAllowedFields = ['note', 'hospital_visit', 'hospital_weight']
+    if (isFutureDate(selectedDate) && !futureAllowedFields.includes(field)) return
 
     const updated = {
       ...currentTask,
-      [field]: value,
+      [field]: field === 'hospital_weight' ? (value === '' ? 6.0 : Number(value)) : value,
       user_name: session.email
     }
+
+    if (field === 'hospital_visit' && value === '') {
+      updated.hospital_weight = 6.0
+    }
+
+    if (field === 'hospital_visit' && value && currentTask.hospital_weight === undefined) {
+      updated.hospital_weight = 6.0
+    }
+
     setCurrentTask(updated)
     saveDayData(updated)
   }
@@ -447,6 +463,8 @@ function App() {
         note: taskToSave.note,
         sneeze_count: Number(taskToSave.sneeze_count || 0),
         blood_sneeze_count: Number(taskToSave.blood_sneeze_count || 0),
+        hospital_visit: taskToSave.hospital_visit || '',
+        hospital_weight: taskToSave.hospital_visit ? Number(taskToSave.hospital_weight || 6.0) : 6.0,
         images: taskToSave.images || [],
         updated_at: new Date()
       })
@@ -652,6 +670,7 @@ function App() {
 
                   let checkedCount = 0
                   let hasNote = false
+                  let hasHospitalVisit = false
                   let sumGrams = 0
                   const sneezeCount = Number(taskData?.sneeze_count || 0)
                   const bloodSneezeCount = Number(taskData?.blood_sneeze_count || 0)
@@ -662,6 +681,9 @@ function App() {
                     if (taskData.check3) { checkedCount++; sumGrams += Number(taskData.gram3 || 0); }
                     if (taskData.note && typeof taskData.note === 'string' && taskData.note.trim() !== '') {
                       hasNote = true
+                    }
+                    if (taskData.hospital_visit && typeof taskData.hospital_visit === 'string' && taskData.hospital_visit.trim() !== '') {
+                      hasHospitalVisit = true
                     }
                   }
 
@@ -721,6 +743,9 @@ function App() {
                         )}
                         {hasNote && (
                           <span style={styles.badgeNote} title="メモあり">📝</span>
+                        )}
+                        {hasHospitalVisit && (
+                          <span style={styles.badgeHospital} title="通院記録あり">🏥</span>
                         )}
                       </div>
                     </div>
@@ -943,6 +968,88 @@ function App() {
                   </div>
                 </div>
 
+                <div style={styles.counterSection}>
+                  <div style={styles.counterItem}>
+                    <span style={styles.counterLabel}>クシャミカウント</span>
+                    <div style={styles.counterControl}>
+                      <button
+                        type="button"
+                        onClick={() => handleCounterChange('sneeze_count', -1)}
+                        disabled={isFutureDate(selectedDate)}
+                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
+                      >
+                        −
+                      </button>
+                      <span style={styles.counterValue}>{String(currentTask.sneeze_count || 0).padStart(2, '0')}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCounterChange('sneeze_count', 1)}
+                        disabled={isFutureDate(selectedDate)}
+                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
+                      >
+                        ＋
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={styles.counterItem}>
+                    <span style={styles.counterLabel}>血のクシャミカウント</span>
+                    <div style={styles.counterControl}>
+                      <button
+                        type="button"
+                        onClick={() => handleCounterChange('blood_sneeze_count', -1)}
+                        disabled={isFutureDate(selectedDate)}
+                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
+                      >
+                        −
+                      </button>
+                      <span style={styles.counterValue}>{String(currentTask.blood_sneeze_count || 0).padStart(2, '0')}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCounterChange('blood_sneeze_count', 1)}
+                        disabled={isFutureDate(selectedDate)}
+                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
+                      >
+                        ＋
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={styles.hospitalSection}>
+                  <label style={styles.noteLabel}>通院記録</label>
+                  <div style={styles.hospitalFieldRow}>
+                    <select
+                      value={currentTask.hospital_visit}
+                      onChange={(e) => handleFieldChange('hospital_visit', e.target.value)}
+                      style={styles.smallSelect}
+                    >
+                      <option value="">選択してください</option>
+                      <option value="定期通院">定期通院</option>
+                      <option value="予防接種">予防接種</option>
+                      <option value="病気通院">病気通院</option>
+                      <option value="その他">その他</option>
+                    </select>
+
+                    {currentTask.hospital_visit && (
+                      <div style={styles.weightFieldWrap}>
+                        <label style={styles.weightLabel}>体重</label>
+                        <div style={styles.weightInputWrap}>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={currentTask.hospital_weight ?? 6.0}
+                            onChange={(e) => handleFieldChange('hospital_weight', e.target.value)}
+                            style={styles.weightInput}
+                          />
+                          <span style={styles.weightUnit}>kg</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div style={styles.noteSection}>
                   <label style={styles.noteLabel}>ロンの気づいたことを入力して下さい：</label>
                   <textarea
@@ -1118,6 +1225,7 @@ const styles = {
   badgeCheck: { background: '#e3f2fd', color: '#0d47a1', padding: '2px 4px', borderRadius: '3px', textAlign: 'center' },
   badgeGram: { background: '#e8f5e9', color: '#1b5e20', padding: '2px 4px', borderRadius: '3px', textAlign: 'center' },
   badgeNote: { fontSize: '12px', alignSelf: 'flex-end', marginTop: '2px' },
+  badgeHospital: { fontSize: '12px', alignSelf: 'flex-end', marginTop: '2px' },
 
   secondaryButton: { padding: '8px 16px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },
   
@@ -1138,6 +1246,14 @@ const styles = {
   counterControl: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' },
   counterButton: { width: '36px', height: '36px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '24px', lineHeight: 1, cursor: 'pointer' },
   counterValue: { minWidth: '60px', textAlign: 'center', fontSize: '24px', fontWeight: 'bold', color: '#0f172a' },
+
+  hospitalSection: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #f1f3f5' },
+  hospitalFieldRow: { display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' },
+  weightFieldWrap: { display: 'flex', alignItems: 'center', gap: '8px' },
+  weightLabel: { fontSize: '13px', color: '#374151' },
+  weightInputWrap: { display: 'flex', alignItems: 'center', gap: '6px' },
+  weightInput: { padding: '6px 8px', borderRadius: '4px', border: '1px solid #ccc', width: '90px', textAlign: 'center' },
+  weightUnit: { fontSize: '13px', color: '#374151' },
 
   noteSection: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' },
   noteLabel: { fontSize: '14px', fontWeight: 'bold' },

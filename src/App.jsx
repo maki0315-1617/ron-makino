@@ -483,6 +483,23 @@ function App() {
     saveDayData(updated)
   }
 
+  const handleHospitalWeightInput = (value) => {
+    const sanitized = value.replace(/[^0-9.]/g, '')
+    const normalized = sanitized.split('.').length > 2 ? sanitized.replace(/\.(?=.*\.)/g, '') : sanitized
+
+    if (normalized === '') {
+      handleFieldChange('hospital_weight', 6.0)
+      return
+    }
+
+    const numericValue = Number(normalized)
+    if (!Number.isFinite(numericValue)) {
+      return
+    }
+
+    handleFieldChange('hospital_weight', normalized)
+  }
+
   const resizeAndConvertImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -1141,12 +1158,14 @@ function App() {
                         <label style={styles.weightLabel}>体重</label>
                         <div style={styles.weightInputWrap}>
                           <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={currentTask.hospital_weight ?? 6.0}
-                            onChange={(e) => handleFieldChange('hospital_weight', e.target.value)}
+                            type="text"
+                            inputMode="decimal"
+                            pattern="[0-9]*[.]?[0-9]*"
+                            value={String(currentTask.hospital_weight ?? 6.0)}
+                            onChange={(e) => handleHospitalWeightInput(e.target.value)}
                             style={styles.weightInput}
+                            placeholder="6.0"
+                            aria-label="体重入力"
                           />
                           <span style={styles.weightUnit}>kg</span>
                         </div>
@@ -1358,11 +1377,11 @@ const styles = {
 
   hospitalSection: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #f1f3f5' },
   hospitalFieldRow: { display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' },
-  weightFieldWrap: { display: 'flex', alignItems: 'center', gap: '8px' },
-  weightLabel: { fontSize: '13px', color: '#374151' },
+  weightFieldWrap: { display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '4px' },
+  weightLabel: { fontSize: '13px', color: '#374151', fontWeight: '600' },
   weightInputWrap: { display: 'flex', alignItems: 'center', gap: '6px' },
-  weightInput: { padding: '6px 8px', borderRadius: '4px', border: '1px solid #ccc', width: '90px', textAlign: 'center' },
-  weightUnit: { fontSize: '13px', color: '#374151' },
+  weightInput: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', width: '110px', textAlign: 'center', fontSize: '18px', minHeight: '44px', WebkitAppearance: 'none', appearance: 'none' },
+  weightUnit: { fontSize: '14px', color: '#374151', fontWeight: '600' },
 
   noteSection: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' },
   noteLabel: { fontSize: '14px', fontWeight: 'bold' },

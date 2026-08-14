@@ -15,6 +15,7 @@ import {
   where, 
   getDocs 
 } from 'firebase/firestore'
+import { jsPDF } from 'jspdf'
 import { ChevronLeft, ChevronRight, LogOut, User, Image as ImageIcon, Trash2, X, ZoomIn } from 'lucide-react'
 
 // --- Chrome等でのクラッシュを防ぐためのErrorBoundaryコンポーネント ---
@@ -172,6 +173,130 @@ function App() {
       return `${year}-${month}-${day}`
     } catch (e) {
       return ''
+    }
+  }
+
+  const generateMonthlyReportPdf = () => {
+    try {
+      const year = currentDate.getFullYear()
+      const month = currentDate.getMonth()
+      const monthLabel = `${year}年 ${month + 1}月`
+      const totalDays = new Date(year, month + 1, 0).getDate()
+
+      const dayValues = []
+      let totalNormal = 0
+      let totalBlood = 0
+      let weightCount = 0
+      let totalWeight = 0
+
+      for (let day = 1; day <= totalDays; day++) {
+        const dateObj = new Date(year, month, day)
+        const dateKey = formatDateKey(dateObj)
+        const taskData = monthTasks[dateKey] || {}
+        const normal = Number(taskData.sneeze_count || 0)
+        const blood = Number(taskData.blood_sneeze_count || 0)
+        const weight = taskData.hospital_visit ? Number(taskData.hospital_weight || 6.0) : null
+
+        totalNormal += normal
+        totalBlood += blood
+
+        if (weight !== null) {
+          totalWeight += weight
+          weightCount += 1
+        }
+
+        dayValues.push({ day, normal, blood, weight })
+      }
+
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const margin = 40
+      const usableWidth = pageWidth - margin * 2
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(18)
+      doc.text(`${monthLabel} ロン君の記録`, margin, 50)
+
+      const summaryText = `通常: ${totalNormal}回 / 血: ${totalBlood}回 / 体重平均: ${weightCount ? (totalWeight / weightCount).toFixed(1) : '0.0'}kg`
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11)
+      doc.text(summaryText, margin, 72)
+
+      const chartWidth = usableWidth
+      const chartHeight = 120
+      const chartY = 100
+
+      const drawLineChart = ({ title, values, color, yMax, yOffset }) => {
+        const x = margin
+        const y = chartY + yOffset
+        const plotHeight = chartHeight
+
+        doc.setDrawColor(180, 180, 180)
+        doc.setLineWidth(0.7)
+        doc.rect(x, y, chartWidth, plotHeight)
+
+        doc.setDrawColor(...color)
+        doc.setLineWidth(1.5)
+
+        const maxValue = Math.max(yMax, 1)
+        const points = values.map((value, index) => {
+          const px = x + (index / Math.max(values.length - 1, 1)) * chartWidth
+          const py = y + plotHeight - ((Number(value) || 0) / maxValue) * plotHeight
+          return { x: px, y: py }
+        })
+
+        if (points.length > 0) {
+          doc.line(points[0].x, points[0].y, points[0].x, y + plotHeight)
+          points.forEach((point, index) => {
+            if (index === 0) return
+            const prev = points[index - 1]
+            doc.line(prev.x, prev.y, point.x, point.y)
+          })
+        }
+
+        doc.setDrawColor(120, 120, 120)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        for (let i = 0; i <= 4; i++) {
+          const value = ((maxValue / 4) * i).toFixed(0)
+          const labelY = y + plotHeight - (i / 4) * plotHeight + 2
+          doc.text(value, x - 22, labelY)
+        }
+
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(10)
+        doc.text(title, x, y - 10)
+
+        doc.setDrawColor(...color)
+        points.forEach((point) => {
+          doc.circle(point.x, point.y, 2, 'F')
+        })
+
+        const firstDayLabel = 1
+        const midDayLabel = Math.max(1, Math.ceil(totalDays / 2))
+        const lastDayLabel = totalDays
+
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.text(String(firstDayLabel), x, y + plotHeight + 12)
+        doc.text(String(midDayLabel), x + chartWidth / 2 - 4, y + plotHeight + 12)
+        doc.text(String(lastDayLabel), x + chartWidth - 8, y + plotHeight + 12)
+      }
+
+      const maxNormal = Math.max(...dayValues.map((d) => d.normal), 1)
+      const maxBlood = Math.max(...dayValues.map((d) => d.blood), 1)
+      const maxWeight = Math.max(...dayValues.map((d) => (d.weight !== null ? d.weight : 0)), 10)
+
+      drawLineChart({ title: '通常クシャミ', values: dayValues.map((d) => d.normal), color: [59, 130, 246], yMax: maxNormal, yOffset: 0 })
+      drawLineChart({ title: '血のクシャミ', values: dayValues.map((d) => d.blood), color: [239, 68, 68], yMax: maxBlood, yOffset: 140 })
+      drawLineChart({ title: '体重 (kg)', values: dayValues.map((d) => (d.weight !== null ? d.weight : 0)), color: [16, 185, 129], yMax: maxWeight, yOffset: 280 })
+
+      const fileName = `${year}_${String(month + 1).padStart(2, '0')}_ron_record.pdf`
+      doc.save(fileName)
+    } catch (error) {
+      console.error('PDF生成エラー:', error)
+      window.alert('PDF生成に失敗しました。')
     }
   }
 
@@ -640,6 +765,9 @@ function App() {
               <button onClick={() => changeMonth(-1)} style={styles.iconButton}><ChevronLeft /></button>
               <h2>{currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月</h2>
               <button onClick={() => changeMonth(1)} style={styles.iconButton}><ChevronRight /></button>
+            </div>
+            <div style={styles.reportHeaderRow}>
+              <button onClick={generateMonthlyReportPdf} style={styles.reportButton}>ロン君の記録</button>
             </div>
 
             <div style={styles.calendarGrid}>
@@ -1167,6 +1295,8 @@ const styles = {
 
   navHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' },
   iconButton: { background: 'none', border: '1px solid #ccc', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer' },
+  reportHeaderRow: { display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' },
+  reportButton: { background: '#0f766e', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 14px', cursor: 'pointer', fontWeight: 'bold' },
   navButton: { display: 'flex', alignItems: 'center', background: '#f8f9fa', border: '1px solid #ccc', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer' },
   
   topSubBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' },

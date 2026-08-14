@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react'
+import notoSansJpUrl from '@fontsource/noto-sans-jp/files/noto-sans-jp-japanese-400-normal.woff2?url'
 import { auth, db } from './firebase'
 import { 
   signInWithEmailAndPassword, 
@@ -176,7 +177,7 @@ function App() {
     }
   }
 
-  const generateMonthlyReportPdf = () => {
+  const generateMonthlyReportPdf = async () => {
     try {
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
@@ -214,30 +215,51 @@ function App() {
       const margin = 40
       const usableWidth = pageWidth - margin * 2
 
-      doc.setFont('helvetica', 'bold')
+      const fontBuffer = await fetch(notoSansJpUrl).then((response) => response.arrayBuffer())
+      doc.addFont(fontBuffer, 'NotoSansJP', 'normal')
+      doc.setFont('NotoSansJP')
+
+      const titleY = 54
+      doc.setTextColor(28, 28, 28)
       doc.setFontSize(18)
-      doc.text(`${monthLabel} ロン君の記録`, margin, 50)
+      doc.text(`${monthLabel} ロン君の記録`, margin, titleY)
 
       const summaryText = `通常: ${totalNormal}回 / 血: ${totalBlood}回 / 体重平均: ${weightCount ? (totalWeight / weightCount).toFixed(1) : '0.0'}kg`
-      doc.setFont('helvetica', 'normal')
       doc.setFontSize(11)
-      doc.text(summaryText, margin, 72)
+      doc.text(summaryText, margin, titleY + 26)
 
       const chartWidth = usableWidth
-      const chartHeight = 120
-      const chartY = 100
+      const chartHeight = 100
+      const chartY = 110
 
-      const drawLineChart = ({ title, values, color, yMax, yOffset }) => {
-        const x = margin
-        const y = chartY + yOffset
+      const drawLegend = (legendX, legendY) => {
+        const entries = [
+          { label: '通常クシャミ', color: [59, 130, 246] },
+          { label: '血のクシャミ', color: [239, 68, 68] },
+          { label: '体重 (kg)', color: [16, 185, 129] }
+        ]
+
+        entries.forEach((entry, index) => {
+          const x = legendX + index * 150
+          doc.setFillColor(...entry.color)
+          doc.roundedRect(x, legendY, 12, 8, 2, 2, 'F')
+          doc.setTextColor(30, 41, 59)
+          doc.setFontSize(9)
+          doc.text(entry.label, x + 18, legendY + 7)
+        })
+      }
+
+      const drawLineChart = ({ title, values, color, yMax, yOffset, startX = margin, startY = chartY + yOffset }) => {
+        const x = startX
+        const y = startY
         const plotHeight = chartHeight
 
-        doc.setDrawColor(180, 180, 180)
+        doc.setDrawColor(220, 220, 220)
         doc.setLineWidth(0.7)
         doc.rect(x, y, chartWidth, plotHeight)
 
         doc.setDrawColor(...color)
-        doc.setLineWidth(1.5)
+        doc.setLineWidth(1.3)
 
         const maxValue = Math.max(yMax, 1)
         const points = values.map((value, index) => {
@@ -247,7 +269,6 @@ function App() {
         })
 
         if (points.length > 0) {
-          doc.line(points[0].x, points[0].y, points[0].x, y + plotHeight)
           points.forEach((point, index) => {
             if (index === 0) return
             const prev = points[index - 1]
@@ -256,28 +277,27 @@ function App() {
         }
 
         doc.setDrawColor(120, 120, 120)
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(9)
+        doc.setFontSize(8)
         for (let i = 0; i <= 4; i++) {
           const value = ((maxValue / 4) * i).toFixed(0)
           const labelY = y + plotHeight - (i / 4) * plotHeight + 2
           doc.text(value, x - 22, labelY)
         }
 
-        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(30, 41, 59)
         doc.setFontSize(10)
         doc.text(title, x, y - 10)
 
         doc.setDrawColor(...color)
+        doc.setFillColor(...color)
         points.forEach((point) => {
-          doc.circle(point.x, point.y, 2, 'F')
+          doc.circle(point.x, point.y, 2.5, 'F')
         })
 
         const firstDayLabel = 1
         const midDayLabel = Math.max(1, Math.ceil(totalDays / 2))
         const lastDayLabel = totalDays
 
-        doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
         doc.text(String(firstDayLabel), x, y + plotHeight + 12)
         doc.text(String(midDayLabel), x + chartWidth / 2 - 4, y + plotHeight + 12)
@@ -289,8 +309,10 @@ function App() {
       const maxWeight = Math.max(...dayValues.map((d) => (d.weight !== null ? d.weight : 0)), 10)
 
       drawLineChart({ title: '通常クシャミ', values: dayValues.map((d) => d.normal), color: [59, 130, 246], yMax: maxNormal, yOffset: 0 })
-      drawLineChart({ title: '血のクシャミ', values: dayValues.map((d) => d.blood), color: [239, 68, 68], yMax: maxBlood, yOffset: 140 })
-      drawLineChart({ title: '体重 (kg)', values: dayValues.map((d) => (d.weight !== null ? d.weight : 0)), color: [16, 185, 129], yMax: maxWeight, yOffset: 280 })
+      drawLineChart({ title: '血のクシャミ', values: dayValues.map((d) => d.blood), color: [239, 68, 68], yMax: maxBlood, yOffset: 120 })
+      drawLineChart({ title: '体重 (kg)', values: dayValues.map((d) => (d.weight !== null ? d.weight : 0)), color: [16, 185, 129], yMax: maxWeight, yOffset: 240 })
+
+      drawLegend(margin, pageHeight - 70)
 
       const fileName = `${year}_${String(month + 1).padStart(2, '0')}_ron_record.pdf`
       doc.save(fileName)

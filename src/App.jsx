@@ -484,20 +484,17 @@ function App() {
   }
 
   const handleHospitalWeightInput = (value) => {
-    const sanitized = value.replace(/[^0-9.]/g, '')
-    const normalized = sanitized.split('.').length > 2 ? sanitized.replace(/\.(?=.*\.)/g, '') : sanitized
-
-    if (normalized === '') {
+    if (value === '') {
       handleFieldChange('hospital_weight', 6.0)
       return
     }
 
-    const numericValue = Number(normalized)
+    const numericValue = Number(value)
     if (!Number.isFinite(numericValue)) {
       return
     }
 
-    handleFieldChange('hospital_weight', normalized)
+    handleFieldChange('hospital_weight', numericValue)
   }
 
   const resizeAndConvertImage = (file) => {
@@ -1158,10 +1155,11 @@ function App() {
                         <label style={styles.weightLabel}>体重</label>
                         <div style={styles.weightInputWrap}>
                           <input
-                            type="text"
+                            type="number"
                             inputMode="decimal"
-                            pattern="[0-9]*[.]?[0-9]*"
-                            value={String(currentTask.hospital_weight ?? 6.0)}
+                            min="0"
+                            step="0.1"
+                            value={currentTask.hospital_weight ?? 6.0}
                             onChange={(e) => handleHospitalWeightInput(e.target.value)}
                             style={styles.weightInput}
                             placeholder="6.0"

@@ -91,6 +91,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [imageError, setImageError] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [sneezeCounterMode, setSneezeCounterMode] = useState('normal')
 
   // 画像拡大モーダル用のステート（選択中の画像のインデックスを管理）
   const [modalIndex, setModalIndex] = useState(null)
@@ -300,9 +301,10 @@ function App() {
     saveDayData(updated)
   }
 
-  const handleCounterChange = (field, delta) => {
+  const handleCounterChange = (delta) => {
     if (isFutureDate(selectedDate)) return
 
+    const field = sneezeCounterMode === 'blood' ? 'blood_sneeze_count' : 'sneeze_count'
     const currentValue = Number(currentTask[field] || 0)
     const nextValue = Math.max(0, currentValue + delta)
     const updated = {
@@ -923,90 +925,46 @@ function App() {
                 <div style={styles.counterSection}>
                   <div style={styles.counterItem}>
                     <span style={styles.counterLabel}>クシャミカウント</span>
-                    <div style={styles.counterControl}>
+                    <div style={styles.counterModeRow}>
                       <button
                         type="button"
-                        onClick={() => handleCounterChange('sneeze_count', -1)}
-                        disabled={isFutureDate(selectedDate)}
-                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
+                        onClick={() => setSneezeCounterMode('normal')}
+                        style={{
+                          ...styles.counterModeButton,
+                          background: sneezeCounterMode === 'normal' ? '#dbeafe' : '#fff',
+                          borderColor: sneezeCounterMode === 'normal' ? '#60a5fa' : '#cbd5e1'
+                        }}
                       >
-                        −
+                        通常
                       </button>
-                      <span style={styles.counterValue}>{String(currentTask.sneeze_count || 0).padStart(2, '0')}</span>
                       <button
                         type="button"
-                        onClick={() => handleCounterChange('sneeze_count', 1)}
-                        disabled={isFutureDate(selectedDate)}
-                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
+                        onClick={() => setSneezeCounterMode('blood')}
+                        style={{
+                          ...styles.counterModeButton,
+                          background: sneezeCounterMode === 'blood' ? '#fef3c7' : '#fff',
+                          borderColor: sneezeCounterMode === 'blood' ? '#fbbf24' : '#cbd5e1'
+                        }}
                       >
-                        ＋
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={styles.counterItem}>
-                    <span style={styles.counterLabel}>血のクシャミカウント</span>
-                    <div style={styles.counterControl}>
-                      <button
-                        type="button"
-                        onClick={() => handleCounterChange('blood_sneeze_count', -1)}
-                        disabled={isFutureDate(selectedDate)}
-                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
-                      >
-                        −
-                      </button>
-                      <span style={styles.counterValue}>{String(currentTask.blood_sneeze_count || 0).padStart(2, '0')}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleCounterChange('blood_sneeze_count', 1)}
-                        disabled={isFutureDate(selectedDate)}
-                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
-                      >
-                        ＋
+                        血
                       </button>
                     </div>
-                  </div>
-                </div>
 
-                <div style={styles.counterSection}>
-                  <div style={styles.counterItem}>
-                    <span style={styles.counterLabel}>クシャミカウント</span>
                     <div style={styles.counterControl}>
                       <button
                         type="button"
-                        onClick={() => handleCounterChange('sneeze_count', -1)}
+                        onClick={() => handleCounterChange(-1)}
                         disabled={isFutureDate(selectedDate)}
                         style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
                       >
                         −
                       </button>
-                      <span style={styles.counterValue}>{String(currentTask.sneeze_count || 0).padStart(2, '0')}</span>
+                      <span style={styles.counterValue}>
+                        {String((sneezeCounterMode === 'blood' ? currentTask.blood_sneeze_count : currentTask.sneeze_count) || 0).padStart(2, '0')}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => handleCounterChange('sneeze_count', 1)}
-                        disabled={isFutureDate(selectedDate)}
-                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
-                      >
-                        ＋
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={styles.counterItem}>
-                    <span style={styles.counterLabel}>血のクシャミカウント</span>
-                    <div style={styles.counterControl}>
-                      <button
-                        type="button"
-                        onClick={() => handleCounterChange('blood_sneeze_count', -1)}
-                        disabled={isFutureDate(selectedDate)}
-                        style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
-                      >
-                        −
-                      </button>
-                      <span style={styles.counterValue}>{String(currentTask.blood_sneeze_count || 0).padStart(2, '0')}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleCounterChange('blood_sneeze_count', 1)}
+                        onClick={() => handleCounterChange(1)}
                         disabled={isFutureDate(selectedDate)}
                         style={{ ...styles.counterButton, opacity: isFutureDate(selectedDate) ? 0.5 : 1 }}
                       >
@@ -1240,9 +1198,11 @@ const styles = {
   totalDisplayBox: { margin: '20px 0', padding: '12px', background: '#f8f9fa', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '16px' },
   totalValue: { fontWeight: 'bold', color: '#2b6cb0', fontSize: '18px' },
 
-  counterSection: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '18px' },
+  counterSection: { display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '18px' },
   counterItem: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 14px' },
   counterLabel: { display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '10px' },
+  counterModeRow: { display: 'flex', gap: '8px', marginBottom: '12px' },
+  counterModeButton: { flex: 1, border: '1px solid #cbd5e1', borderRadius: '6px', padding: '6px 8px', fontSize: '12px', cursor: 'pointer' },
   counterControl: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' },
   counterButton: { width: '36px', height: '36px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '24px', lineHeight: 1, cursor: 'pointer' },
   counterValue: { minWidth: '60px', textAlign: 'center', fontSize: '24px', fontWeight: 'bold', color: '#0f172a' },

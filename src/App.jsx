@@ -485,7 +485,7 @@ function App() {
 
   const handleHospitalWeightInput = (value) => {
     if (value === '') {
-      handleFieldChange('hospital_weight', 6.0)
+      handleFieldChange('hospital_weight', 0)
       return
     }
 
@@ -1378,7 +1378,7 @@ const styles = {
   weightFieldWrap: { display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '4px' },
   weightLabel: { fontSize: '13px', color: '#374151', fontWeight: '600' },
   weightInputWrap: { display: 'flex', alignItems: 'center', gap: '6px' },
-  weightInput: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', width: '110px', textAlign: 'center', fontSize: '18px', minHeight: '44px', WebkitAppearance: 'none', appearance: 'none' },
+  weightInput: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', width: '120px', textAlign: 'center', fontSize: '18px', minHeight: '44px', height: '44px', boxSizing: 'border-box', MozAppearance: 'textfield', WebkitAppearance: 'auto' },
   weightUnit: { fontSize: '14px', color: '#374151', fontWeight: '600' },
 
   noteSection: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' },

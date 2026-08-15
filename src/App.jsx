@@ -497,6 +497,12 @@ function App() {
     handleFieldChange('hospital_weight', numericValue)
   }
 
+  const handleHospitalWeightStep = (delta) => {
+    const currentValue = Number(currentTask.hospital_weight ?? 0)
+    const nextValue = Math.max(0, Number((currentValue + delta).toFixed(1)))
+    handleFieldChange('hospital_weight', nextValue)
+  }
+
   const resizeAndConvertImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -1154,17 +1160,33 @@ function App() {
                       <div style={styles.weightFieldWrap}>
                         <label style={styles.weightLabel}>体重</label>
                         <div style={styles.weightInputWrap}>
+                          <button
+                            type="button"
+                            onClick={() => handleHospitalWeightStep(-0.1)}
+                            style={styles.weightStepButton}
+                            aria-label="体重を0.1kg減らす"
+                          >
+                            −
+                          </button>
                           <input
                             type="number"
                             inputMode="decimal"
                             min="0"
                             step="0.1"
-                            value={currentTask.hospital_weight ?? 6.0}
+                            value={currentTask.hospital_weight ?? 0}
                             onChange={(e) => handleHospitalWeightInput(e.target.value)}
                             style={styles.weightInput}
                             placeholder="6.0"
                             aria-label="体重入力"
                           />
+                          <button
+                            type="button"
+                            onClick={() => handleHospitalWeightStep(0.1)}
+                            style={styles.weightStepButton}
+                            aria-label="体重を0.1kg増やす"
+                          >
+                            ＋
+                          </button>
                           <span style={styles.weightUnit}>kg</span>
                         </div>
                       </div>
@@ -1378,6 +1400,7 @@ const styles = {
   weightFieldWrap: { display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '4px' },
   weightLabel: { fontSize: '13px', color: '#374151', fontWeight: '600' },
   weightInputWrap: { display: 'flex', alignItems: 'center', gap: '6px' },
+  weightStepButton: { width: '38px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '22px', lineHeight: 1, cursor: 'pointer', color: '#0f172a', padding: 0 },
   weightInput: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', width: '120px', textAlign: 'center', fontSize: '18px', minHeight: '44px', height: '44px', boxSizing: 'border-box', MozAppearance: 'textfield', WebkitAppearance: 'auto' },
   weightUnit: { fontSize: '14px', color: '#374151', fontWeight: '600' },
 
